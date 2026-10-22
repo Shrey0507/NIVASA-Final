@@ -1,31 +1,34 @@
 /**
  * Auth routes — /api/auth/*
  *
- * POST /api/auth/login     — authenticate and return session + role
- * GET  /api/auth/me        — return the current user's trusted role and profile
- * POST /api/auth/bootstrap — one-time super_admin assignment (protected)
+ * This module exports TWO routers:
+ *
+ *   publicRouter    → POST /login  (no JWT required — this IS the login)
+ *   protectedRouter → GET /me, POST /bootstrap  (JWT required)
+ *
+ * index.js mounts publicRouter BEFORE authMiddleware and protectedRouter AFTER.
  */
 import { Router } from "express";
+import { getAdminClient } from "../lib/supabase.js";
 import { extractRole, extractHostelScope } from "../middleware/authorize.js";
 
-const router = Router();
-
-/**
- * The designated super admin email. Normalized to lowercase.
- * This is only used for the bootstrap endpoint to assign the initial
- * super_admin role — it does NOT grant privileges by itself.
- */
 const SUPER_ADMIN_EMAIL = "shreyankvy@gmail.com";
+
+// ── Public router (no auth required) ────────────────────────
+
+export const publicRouter = Router();
 
 /**
  * POST /api/auth/login
  *
- * Accepts { identifier, password } and signs in via Supabase Auth.
- * Returns the session tokens and the user's trusted role.
+ * Genuinely public endpoint. Accepts { identifier, password }, authenticates
+ * via Supabase Auth using the admin client (service-role key), and returns
+ * the session tokens plus the user's trusted role.
  *
- * The frontend calls this, then sets the session via supabase.auth.setSession().
+ * The admin client is created directly here — req.supabaseAdmin is NOT
+ * available because this route runs before authMiddleware.
  */
-router.post("/login", async (req, res, next) => {
+publicRouter.post("/login", async (req, res, next) => {
   try {
     const { identifier, password } = req.body;
     if (!identifier || !password) {
@@ -34,12 +37,16 @@ router.post("/login", async (req, res, next) => {
       });
     }
 
-    const admin = req.supabaseAdmin;
+    // Create admin client directly — NOT from req (we're pre-auth)
+    const admin = getAdminClient();
 
-    // Sign in with email/password using the admin client
-    const email = identifier.includes("@") ? identifier.trim().toLowerCase() : identifier.trim();
+    const email = identifier.includes("@")
+      ? identifier.trim().toLowerCase()
+      : identifier.trim();
+
     const { data: signInData, error: signInErr } =
       await admin.auth.signInWithPassword({ email, password });
+
     if (signInErr) {
       return res.status(401).json({
         error: { message: "Invalid credentials. Please check your email and password." },
@@ -86,17 +93,20 @@ router.post("/login", async (req, res, next) => {
   }
 });
 
+// ── Protected router (JWT required — mounted after authMiddleware) ───
+
+export const protectedRouter = Router();
+
 /**
  * GET /api/auth/me
  *
  * Returns the trusted role and profile for the currently authenticated user.
- * This is the single source of truth the frontend uses after session restoration.
+ * Requires a valid Bearer token (runs after authMiddleware).
  */
-router.get("/me", async (req, res, next) => {
+protectedRouter.get("/me", async (req, res, next) => {
   try {
     const admin = req.supabaseAdmin;
 
-    // Fetch the full user object from Supabase Auth to get app_metadata
     const { data: userData, error: userErr } =
       await admin.auth.admin.getUserById(req.userId);
     if (userErr || !userData?.user) {
@@ -111,7 +121,6 @@ router.get("/me", async (req, res, next) => {
       user_metadata: user.user_metadata,
     });
 
-    // Look up student record if student role
     let studentRecord = null;
     if (role === "student") {
       const { data: sData } = await admin
@@ -141,20 +150,13 @@ router.get("/me", async (req, res, next) => {
 /**
  * POST /api/auth/bootstrap
  *
- * One-time bootstrap to assign the super_admin role to the designated email.
- *
- * Security:
- * - Only works for the hardcoded SUPER_ADMIN_EMAIL
- * - The caller must be authenticated as that exact user (verified via JWT sub)
- * - Uses app_metadata (only settable via service-role key)
- * - Safe to re-run (idempotent)
- * - Does NOT expose any secrets or accept arbitrary email/role inputs
+ * One-time super_admin assignment for the designated email.
+ * Requires a valid Bearer token (runs after authMiddleware).
  */
-router.post("/bootstrap", async (req, res, next) => {
+protectedRouter.post("/bootstrap", async (req, res, next) => {
   try {
     const admin = req.supabaseAdmin;
 
-    // Get the full auth user to verify email
     const { data: userData, error: userErr } =
       await admin.auth.admin.getUserById(req.userId);
     if (userErr || !userData?.user) {
@@ -166,14 +168,12 @@ router.post("/bootstrap", async (req, res, next) => {
     const user = userData.user;
     const normalizedEmail = (user.email || "").trim().toLowerCase();
 
-    // Only the designated super admin email can use this endpoint
     if (normalizedEmail !== SUPER_ADMIN_EMAIL) {
       return res.status(403).json({
         error: { message: "This account is not authorized for bootstrap." },
       });
     }
 
-    // Check if already bootstrapped
     if (user.app_metadata?.role === "super_admin") {
       return res.json({
         message: "Already bootstrapped as super_admin.",
@@ -181,7 +181,6 @@ router.post("/bootstrap", async (req, res, next) => {
       });
     }
 
-    // Set app_metadata.role = super_admin (only service-role can do this)
     const { error: updateErr } = await admin.auth.admin.updateUserById(
       user.id,
       {
@@ -199,4 +198,5 @@ router.post("/bootstrap", async (req, res, next) => {
   }
 });
 
-export default router;
+// Default export kept for backward-compat (not used by new index.js)
+export default protectedRouter;

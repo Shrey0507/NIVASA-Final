@@ -10,7 +10,7 @@ import {
   enforceHostelScope,
   requireRole,
 } from "./middleware/authorize.js";
-import authRouter from "./routes/auth.js";
+import { publicRouter as authPublicRouter, protectedRouter as authProtectedRouter } from "./routes/auth.js";
 import dashboardRouter from "./routes/dashboard.js";
 import studentsRouter from "./routes/students.js";
 import roomsRouter from "./routes/rooms.js";
@@ -34,14 +34,17 @@ app.get("/api/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
-// All /api/* routes require a valid user JWT
-app.use("/api", authMiddleware);
+// ── Public routes (BEFORE auth middleware) ──────────────────
+// POST /api/auth/login does NOT require an existing token
+app.use("/api/auth", authPublicRouter);
 
-// Attach the trusted role from JWT claims to every request
+// ── Auth wall — everything below requires a valid JWT ──────
+app.use("/api", authMiddleware);
 app.use("/api", attachRole);
 
-// ── Auth routes (role-aware but no role restriction) ───────
-app.use("/api/auth", authRouter);
+// ── Protected auth routes ──────────────────────────────────
+// GET /api/auth/me and POST /api/auth/bootstrap require a JWT
+app.use("/api/auth", authProtectedRouter);
 
 // ── Admin routes — require admin role + enforce hostel scope ──
 app.use("/api/dashboard", requireAdmin, enforceHostelScope, dashboardRouter);
