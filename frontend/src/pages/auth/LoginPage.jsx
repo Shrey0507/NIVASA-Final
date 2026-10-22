@@ -1,9 +1,8 @@
 import { useState, useEffect } from "react";
-import { Link, useNavigate, useLocation } from "react-router-dom";
-import { ArrowLeft, ArrowRight, Eye, EyeOff, Lock, Mail, Shield, GraduationCap } from "lucide-react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { ArrowRight, Eye, EyeOff, Lock, Mail, Shield, GraduationCap } from "lucide-react";
 import { AuthLayout } from "@/components/layout/AuthLayout";
 import { useAuth } from "@/hooks/useAuth";
-import { apiRequest } from "@/lib/apiClient";
 import supabase from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,14 +14,14 @@ import { Label } from "@/components/ui/label";
  * Accepts an optional initialMode prop ("admin" | "student") so that
  * /admin/login and /student/login open the correct form directly.
  *
- * Authorization is ALWAYS determined server-side via the user_profiles table.
+ * Authorization is ALWAYS determined server-side via app_metadata.role.
  * The mode selector only controls the login experience — it never grants
  * privileges.
  */
 export default function LoginPage({ initialMode }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login } = useAuth();
+  const { login, isAuthenticated, role, loading: authLoading } = useAuth();
   const [mode, setMode] = useState(initialMode || "student"); // "admin" | "student"
   const [form, setForm] = useState({ identifier: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
@@ -41,6 +40,17 @@ export default function LoginPage({ initialMode }) {
     }
   }, [initialMode, location.pathname]);
 
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (!authLoading && isAuthenticated && role) {
+      if (role === "student") {
+        navigate("/student", { replace: true });
+      } else {
+        navigate("/admin", { replace: true });
+      }
+    }
+  }, [authLoading, isAuthenticated, role, navigate]);
+
   const switchMode = (newMode) => {
     setError("");
     setMessage("");
@@ -57,20 +67,9 @@ export default function LoginPage({ initialMode }) {
       return setError("Email/username and password are required.");
     setLoading(true);
     try {
-      const result = await login(form.identifier, form.password);
-      // After login, /auth/me is called by the AuthProvider to determine the
-      // authoritative role. We read the role from the auth context indirectly
-      // by calling /auth/me ourselves for the redirect target.
-      const me = await apiRequest("/auth/me");
-      const role = me.role;
-
-      // Route based on server-determined role
-      if (role === "student") {
-        navigate("/student", { replace: true });
-      } else {
-        // super_admin, hostel_admin, warden, admin — all go to admin dashboard
-        navigate("/admin", { replace: true });
-      }
+      await login(form.identifier, form.password);
+      // After login, onAuthStateChange fires → loadSession → role is set
+      // The useEffect above handles redirect based on role
     } catch (err) {
       setError(
         err?.message || "Unable to sign in. Check your credentials or contact the hostel office."
@@ -93,11 +92,11 @@ export default function LoginPage({ initialMode }) {
     else setMessage("If the account exists, a password reset email has been sent.");
   };
 
+  // Don't render login form while checking existing session
+  if (authLoading) return null;
+
   // ── Login Form (shared by both admin and student modes) ───────────────
   const isAdmin = mode === "admin";
-  const accentClasses = isAdmin
-    ? { ring: "focus-visible:ring-violet-400", btn: "" }
-    : { ring: "focus-visible:ring-emerald-400", btn: "" };
 
   return (
     <AuthLayout

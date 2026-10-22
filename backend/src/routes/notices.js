@@ -1,7 +1,13 @@
 import { Router } from "express";
+import { requireAdmin } from "../middleware/authorize.js";
 const router = Router();
 
-/** GET /api/notices */
+/**
+ * GET /api/notices
+ *
+ * Both admins and students can read notices.
+ * No hostel-scoping on notices — they're typically institution-wide.
+ */
 router.get("/", async (req, res, next) => {
   try {
     const { audience, limit = 50 } = req.query;
@@ -21,8 +27,8 @@ router.get("/", async (req, res, next) => {
   }
 });
 
-/** POST /api/notices */
-router.post("/", async (req, res, next) => {
+/** POST /api/notices — admin only */
+router.post("/", requireAdmin, async (req, res, next) => {
   try {
     const { data, error } = await req.supabaseAdmin
       .from("notices")
@@ -36,8 +42,8 @@ router.post("/", async (req, res, next) => {
   }
 });
 
-/** PATCH /api/notices/:id */
-router.patch("/:id", async (req, res, next) => {
+/** PATCH /api/notices/:id — admin only */
+router.patch("/:id", requireAdmin, async (req, res, next) => {
   try {
     const { data, error } = await req.supabaseAdmin
       .from("notices")
@@ -52,8 +58,8 @@ router.patch("/:id", async (req, res, next) => {
   }
 });
 
-/** DELETE /api/notices/:id */
-router.delete("/:id", async (req, res, next) => {
+/** DELETE /api/notices/:id — admin only */
+router.delete("/:id", requireAdmin, async (req, res, next) => {
   try {
     const { error } = await req.supabaseAdmin
       .from("notices")

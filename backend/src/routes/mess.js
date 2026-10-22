@@ -1,7 +1,12 @@
 import { Router } from "express";
+import { requireAdmin } from "../middleware/authorize.js";
 const router = Router();
 
-/** GET /api/mess */
+/**
+ * GET /api/mess
+ *
+ * Both admins and students can read the mess menu.
+ */
 router.get("/", async (req, res, next) => {
   try {
     const { limit = 100 } = req.query;
@@ -17,8 +22,8 @@ router.get("/", async (req, res, next) => {
   }
 });
 
-/** POST /api/mess */
-router.post("/", async (req, res, next) => {
+/** POST /api/mess — admin only */
+router.post("/", requireAdmin, async (req, res, next) => {
   try {
     const { data, error } = await req.supabaseAdmin
       .from("mess")
@@ -32,8 +37,8 @@ router.post("/", async (req, res, next) => {
   }
 });
 
-/** PATCH /api/mess/:id */
-router.patch("/:id", async (req, res, next) => {
+/** PATCH /api/mess/:id — admin only */
+router.patch("/:id", requireAdmin, async (req, res, next) => {
   try {
     const { data, error } = await req.supabaseAdmin
       .from("mess")

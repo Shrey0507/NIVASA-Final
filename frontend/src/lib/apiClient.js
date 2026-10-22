@@ -6,10 +6,25 @@ export async function apiRequest(path, options = {}) {
   const { data: { session } } = await supabase.auth.getSession();
   const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
   if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
+
   const response = await fetch(`${API_URL}${path}`, { ...options, headers });
   const payload = await response.json().catch(() => null);
-  if (response.status === 401) await supabase.auth.signOut();
-  if (!response.ok) throw new Error(payload?.error?.message || payload?.error || "Request failed");
+
+  // Handle authentication failure — sign out and redirect
+  if (response.status === 401) {
+    await supabase.auth.signOut();
+    throw new Error(payload?.error?.message || "Session expired. Please sign in again.");
+  }
+
+  // Handle authorization failure — user is authenticated but lacks permission
+  if (response.status === 403) {
+    throw new Error(payload?.error?.message || "You do not have permission to perform this action.");
+  }
+
+  if (!response.ok) {
+    throw new Error(payload?.error?.message || payload?.error || "Request failed");
+  }
+
   return payload;
 }
 

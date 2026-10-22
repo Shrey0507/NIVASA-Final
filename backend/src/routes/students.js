@@ -1,7 +1,13 @@
 import { Router } from "express";
 const router = Router();
 
-/** GET /api/students */
+/**
+ * GET /api/students
+ *
+ * Admin: list students (hostel-scoped by middleware).
+ * The hostel query param is enforced by enforceHostelScope in index.js —
+ * boys_admin can only see boys hostel students, etc.
+ */
 router.get("/", async (req, res, next) => {
   try {
     const { hostel, department, year, search, limit = 50 } = req.query;
@@ -24,7 +30,11 @@ router.get("/", async (req, res, next) => {
   }
 });
 
-/** GET /api/students/:id */
+/**
+ * GET /api/students/:id
+ *
+ * Admin: get a single student. Validates hostel scope.
+ */
 router.get("/:id", async (req, res, next) => {
   try {
     const { data, error } = await req.supabaseAdmin
@@ -33,18 +43,37 @@ router.get("/:id", async (req, res, next) => {
       .eq("id", req.params.id)
       .single();
     if (error) throw error;
+
+    // Enforce hostel scope — admin can only view students in their hostel
+    if (req.hostelScope && data.hostel !== req.hostelScope) {
+      return res.status(403).json({
+        error: { message: "You do not have access to this student's records." },
+      });
+    }
+
     res.json({ data });
   } catch (err) {
     next(err);
   }
 });
 
-/** POST /api/students */
+/**
+ * POST /api/students
+ *
+ * Admin: create a student record. Enforces hostel scope.
+ */
 router.post("/", async (req, res, next) => {
   try {
+    const body = { ...req.body };
+
+    // Enforce hostel scope for non-super admins
+    if (req.hostelScope) {
+      body.hostel = req.hostelScope;
+    }
+
     const { data, error } = await req.supabaseAdmin
       .from("students")
-      .insert(req.body)
+      .insert(body)
       .select()
       .single();
     if (error) throw error;
@@ -54,9 +83,33 @@ router.post("/", async (req, res, next) => {
   }
 });
 
-/** PATCH /api/students/:id */
+/**
+ * PATCH /api/students/:id
+ *
+ * Admin: update a student. Validates hostel scope.
+ */
 router.patch("/:id", async (req, res, next) => {
   try {
+    // Verify the student belongs to admin's hostel scope
+    if (req.hostelScope) {
+      const { data: existing } = await req.supabaseAdmin
+        .from("students")
+        .select("hostel")
+        .eq("id", req.params.id)
+        .single();
+      if (existing && existing.hostel !== req.hostelScope) {
+        return res.status(403).json({
+          error: { message: "You do not have access to this student's records." },
+        });
+      }
+      // Prevent changing hostel assignment to a different hostel
+      if (req.body.hostel && req.body.hostel !== req.hostelScope) {
+        return res.status(403).json({
+          error: { message: "You cannot transfer students to another hostel." },
+        });
+      }
+    }
+
     const { data, error } = await req.supabaseAdmin
       .from("students")
       .update(req.body)
@@ -70,9 +123,27 @@ router.patch("/:id", async (req, res, next) => {
   }
 });
 
-/** DELETE /api/students/:id */
+/**
+ * DELETE /api/students/:id
+ *
+ * Admin: remove a student. Validates hostel scope.
+ */
 router.delete("/:id", async (req, res, next) => {
   try {
+    // Verify hostel scope before deletion
+    if (req.hostelScope) {
+      const { data: existing } = await req.supabaseAdmin
+        .from("students")
+        .select("hostel")
+        .eq("id", req.params.id)
+        .single();
+      if (existing && existing.hostel !== req.hostelScope) {
+        return res.status(403).json({
+          error: { message: "You do not have access to this student's records." },
+        });
+      }
+    }
+
     const { error } = await req.supabaseAdmin
       .from("students")
       .delete()

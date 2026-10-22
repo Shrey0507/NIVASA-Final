@@ -1,10 +1,29 @@
 import { Router } from "express";
 const router = Router();
 
-/** POST /api/allocations */
+/**
+ * POST /api/allocations
+ *
+ * Admin only (enforced at index.js level). Hostel scope validated here.
+ */
 router.post("/", async (req, res, next) => {
   try {
     const { student_id, room_id } = req.body;
+
+    // Validate hostel scope — ensure student belongs to admin's hostel
+    if (req.hostelScope) {
+      const { data: student } = await req.supabaseAdmin
+        .from("students")
+        .select("hostel")
+        .eq("id", student_id)
+        .single();
+      if (student && student.hostel !== req.hostelScope) {
+        return res.status(403).json({
+          error: { message: "You do not have access to this student's hostel." },
+        });
+      }
+    }
+
     const { data, error } = await req.supabaseAdmin
       .from("allocations")
       .insert({ student_id, room_id })
@@ -24,7 +43,11 @@ router.post("/", async (req, res, next) => {
   }
 });
 
-/** DELETE /api/allocations/:id */
+/**
+ * DELETE /api/allocations/:id
+ *
+ * Admin only. Validates hostel scope.
+ */
 router.delete("/:id", async (req, res, next) => {
   try {
     // Get allocation to find student
@@ -34,6 +57,20 @@ router.delete("/:id", async (req, res, next) => {
       .eq("id", req.params.id)
       .single();
     if (fetchErr) throw fetchErr;
+
+    // Validate hostel scope
+    if (req.hostelScope && allocation?.student_id) {
+      const { data: student } = await req.supabaseAdmin
+        .from("students")
+        .select("hostel")
+        .eq("id", allocation.student_id)
+        .single();
+      if (student && student.hostel !== req.hostelScope) {
+        return res.status(403).json({
+          error: { message: "You do not have access to this student's hostel." },
+        });
+      }
+    }
 
     const { error } = await req.supabaseAdmin
       .from("allocations")

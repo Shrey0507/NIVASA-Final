@@ -1,66 +1,84 @@
-﻿import { createContext, useContext, useEffect, useMemo, useState, useCallback } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, useCallback } from "react";
 import supabase from "@/lib/supabase";
 import { apiRequest } from "@/lib/apiClient";
 
+/**
+ * Role definitions for the admin side.
+ * Maps the server role → display label and hostel scope.
+ */
 export const ADMIN_ROLES = {
+  super_admin: { label: "Super Administrator", hostel: null },
+  boys_admin:  { label: "Boys' Hostel Administrator", hostel: "boys" },
+  girls_admin: { label: "Girls' Hostel Administrator", hostel: "girls" },
+  // Legacy mappings kept for backward compat in AdminLayout display
   super: { label: "Super Administrator", hostel: null },
-  boys: { label: "Boys' Hostel Administrator", hostel: "boys" },
+  boys:  { label: "Boys' Hostel Administrator", hostel: "boys" },
   girls: { label: "Girls' Hostel Administrator", hostel: "girls" },
 };
+
+const ADMIN_ROLE_SET = new Set(["super_admin", "boys_admin", "girls_admin"]);
 
 const INITIAL = {
   isAuthenticated: false,
   loading: true,
-  role: null,
+  role: null,        // "super_admin" | "boys_admin" | "girls_admin" | "student" | null
+  displayRole: null, // "super" | "boys" | "girls" | "student" — for UI routing
   hostel: null,
   user: null,
   profile: null,
   student: null,
-  serverRole: null, // raw role from server
 };
 
 const AuthContext = createContext(null);
 
+/**
+ * Map the server's canonical role to the frontend's shorter display role
+ * used in routing and AdminLayout.
+ */
+function toDisplayRole(serverRole) {
+  if (serverRole === "super_admin") return "super";
+  if (serverRole === "boys_admin") return "boys";
+  if (serverRole === "girls_admin") return "girls";
+  if (serverRole === "student") return "student";
+  return null;
+}
+
 export function AuthProvider({ children }) {
   const [auth, setAuth] = useState(INITIAL);
 
+  /**
+   * Fetch the authenticated user's trusted role and profile from the backend.
+   * This is the single source of truth — never trust client-side data.
+   */
   const loadSession = useCallback(async (session) => {
     if (!session) return setAuth({ ...INITIAL, loading: false });
     try {
       const me = await apiRequest("/auth/me");
+      const serverRole = me.role; // super_admin | boys_admin | girls_admin | student | unknown
       const profile = me.profile || {};
-      const serverRole = me.role; // authoritative: student | super_admin | hostel_admin | warden | admin
-      const isStudent = serverRole === "student";
-      const profileHostel = profile.hostel || profile.hostel_type || profile.hostel_category;
+      const displayRole = toDisplayRole(serverRole);
 
-      // Map server role to frontend display role
-      let accessRole;
-      if (isStudent) {
-        accessRole = "student";
-      } else if (serverRole === "super_admin") {
-        accessRole = "super";
-      } else if (["hostel_admin", "warden"].includes(serverRole)) {
-        accessRole = profileHostel === "girls" ? "girls" : "boys";
-      } else {
-        // fallback for "admin" role — treat as super
-        accessRole = "super";
+      if (!displayRole || serverRole === "unknown") {
+        // No valid role assigned — sign out and show message
+        await supabase.auth.signOut();
+        return setAuth({ ...INITIAL, loading: false });
       }
 
-      const student = isStudent
-        ? (me.student || profile.student || profile.student_record || profile)
-        : null;
+      const student = serverRole === "student" ? (me.student || null) : null;
 
       setAuth({
         isAuthenticated: true,
         loading: false,
-        role: accessRole,
-        hostel: profileHostel || null,
-        user: profile.full_name || session.user.email,
+        role: displayRole,
+        serverRole,
+        hostel: me.hostel || null,
+        user: profile.full_name || session.user?.email || "User",
         profile,
         student,
-        serverRole,
+        displayRole,
       });
     } catch {
+      // Auth verification failed — clear session
       await supabase.auth.signOut();
       setAuth({ ...INITIAL, loading: false });
     }
@@ -74,14 +92,24 @@ export function AuthProvider({ children }) {
     return () => subscription.unsubscribe();
   }, [loadSession]);
 
+  /**
+   * Login: authenticate via Supabase directly, then loadSession handles
+   * fetching the trusted role from the backend.
+   */
   const login = useCallback(async (identifier, password) => {
-    const result = await apiRequest("/auth/login", {
-      method: "POST",
-      body: JSON.stringify({ identifier, password }),
+    const email = identifier.includes("@")
+      ? identifier.trim().toLowerCase()
+      : identifier.trim();
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
     });
-    // setSession triggers onAuthStateChange which calls loadSession
-    await supabase.auth.setSession(result.session);
-    return result;
+    if (error) {
+      throw new Error(error.message || "Invalid credentials.");
+    }
+    // onAuthStateChange will fire and call loadSession automatically
+    return data;
   }, []);
 
   const logout = useCallback(async () => {
@@ -96,8 +124,11 @@ export function AuthProvider({ children }) {
       logout,
       loginAdmin: login,
       loginStudent: login,
+      isAdmin: ADMIN_ROLE_SET.has(auth.serverRole),
+      isSuperAdmin: auth.serverRole === "super_admin",
       getHostelFilter: () => auth.hostel,
-      canAccessHostel: (hostel) => auth.role === "super" || auth.hostel === hostel,
+      canAccessHostel: (hostel) =>
+        auth.role === "super" || auth.hostel === hostel,
     }),
     [auth, login, logout]
   );
