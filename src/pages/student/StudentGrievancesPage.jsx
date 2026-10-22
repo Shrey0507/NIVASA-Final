@@ -1,0 +1,11 @@
+import { useEffect, useState } from "react";
+import { Plus } from "lucide-react";
+import { getMyGrievances, createMyGrievance } from "@/services/studentService";
+import { PageHeader } from "@/components/common/PageHeader";
+import { SectionCard } from "@/components/common/SectionCard";
+import { EmptyState } from "@/components/common/EmptyState";
+import { StatusBadge } from "@/components/common/StatusBadge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+export default function StudentGrievancesPage() { const [items, setItems] = useState([]); const [form, setForm] = useState({ subject: "", category: "Maintenance", description: "" }); const [show, setShow] = useState(false); const [error, setError] = useState(""); const load = () => getMyGrievances().then(setItems).catch((e) => setError(e.message)); useEffect(load, []); const submit = async (e) => { e.preventDefault(); try { await createMyGrievance(form); setForm({ subject: "", category: "Maintenance", description: "" }); setShow(false); load(); } catch (e) { setError(e.message); } }; return <><PageHeader title="Grievances" description="Submit and track your complaints."><Button onClick={() => setShow(!show)}><Plus/> Raise a grievance</Button></PageHeader>{show && <SectionCard title="New grievance"><form onSubmit={submit} className="space-y-3"><Input placeholder="Subject" value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })}/><Input placeholder="Category" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}/><Textarea placeholder="Describe the issue" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })}/><Button type="submit">Submit</Button></form></SectionCard>}{error && <p className="text-sm text-destructive">{error}</p>}<div className="grid gap-4 lg:grid-cols-2">{items.length ? items.map((g) => <SectionCard key={g.id} title={g.subject || g.title}><p className="text-sm text-muted-foreground">{g.description}</p><div className="mt-3 flex justify-between"><span>{g.category}</span><StatusBadge status={g.status}/></div></SectionCard>) : <EmptyState title="No grievances" description="Your submitted grievances will appear here."/>}</div></>; }
