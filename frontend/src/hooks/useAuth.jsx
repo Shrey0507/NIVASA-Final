@@ -95,8 +95,11 @@ export function AuthProvider({ children }) {
   /**
    * Login: authenticate via Supabase directly, then loadSession handles
    * fetching the trusted role from the backend.
+   * @param {string} identifier - Email address (already resolved) or identifier to look up
+   * @param {string} password
    */
   const login = useCallback(async (identifier, password) => {
+    // If already an email, use it directly; otherwise treat as identifier to look up
     const email = identifier.includes("@")
       ? identifier.trim().toLowerCase()
       : identifier.trim();
@@ -113,7 +116,11 @@ export function AuthProvider({ children }) {
   }, []);
 
   const logout = useCallback(async () => {
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } catch {
+      // Session may already be gone; that's fine
+    }
     setAuth({ ...INITIAL, loading: false });
   }, []);
 

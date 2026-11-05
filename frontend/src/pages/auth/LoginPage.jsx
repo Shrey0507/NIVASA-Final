@@ -4,6 +4,7 @@ import { ArrowRight, Eye, EyeOff, Lock, Mail, Shield, GraduationCap } from "luci
 import { AuthLayout } from "@/components/layout/AuthLayout";
 import { useAuth } from "@/hooks/useAuth";
 import supabase from "@/lib/supabase";
+import { resolveLoginIdentifier } from "@/services/accounts";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -64,16 +65,17 @@ export default function LoginPage({ initialMode }) {
     setError("");
     setMessage("");
     if (!form.identifier.trim() || !form.password)
-      return setError("Email/username and password are required.");
+      return setError("Email, username, or USN and password are required.");
     setLoading(true);
     try {
-      await login(form.identifier, form.password);
+      // First resolve the login identifier to an email
+      const email = await resolveLoginIdentifier(form.identifier.trim());
+      // Then login with the resolved email
+      await login(email, form.password);
       // After login, onAuthStateChange fires → loadSession → role is set
       // The useEffect above handles redirect based on role
     } catch (err) {
-      setError(
-        err?.message || "Unable to sign in. Check your credentials or contact the hostel office."
-      );
+      setError(err?.message || "Invalid credentials.");
     } finally {
       setLoading(false);
     }
@@ -152,7 +154,7 @@ export default function LoginPage({ initialMode }) {
       <form onSubmit={submit} className="mt-6 space-y-4">
         <div className="space-y-2">
           <Label htmlFor="identifier" className="text-white/85">
-            Email or username
+            Email, username or USN
           </Label>
           <div className="relative">
             <Mail className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-white/40" />
