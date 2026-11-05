@@ -1,6 +1,13 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { BedDouble, Plus, Search, Users, Building2, CheckCircle2 } from "lucide-react";
+import {
+  BedDouble,
+  Plus,
+  Search,
+  Users,
+  Building2,
+  CheckCircle2,
+} from "lucide-react";
 
 import { getRooms, createRoom } from "@/services/adminService";
 import { PageHeader } from "@/components/common/PageHeader";
@@ -102,17 +109,21 @@ export default function RoomsPage() {
     };
   }, [rooms]);
 
-  const blocks = useMemo(() => {
-    return [...new Set(rooms.map((room) => room.block).filter(Boolean))].sort();
-  }, [rooms]);
+  const blocks = useMemo(
+    () =>
+      [...new Set(rooms.map((room) => room.block).filter(Boolean))].sort(),
+    [rooms]
+  );
 
-  const floors = useMemo(() => {
-    return [
-      ...new Set(
-        rooms.map((room) => String(room.floor ?? 0))
-      ),
-    ].sort((a, b) => Number(a) - Number(b));
-  }, [rooms]);
+  const floors = useMemo(
+    () =>
+      [
+        ...new Set(
+          rooms.map((room) => String(room.floor ?? 0))
+        ),
+      ].sort((a, b) => Number(a) - Number(b)),
+    [rooms]
+  );
 
   const handleCreateRoom = async (event) => {
     event.preventDefault();
@@ -128,7 +139,7 @@ export default function RoomsPage() {
     }
 
     if (!Number.isInteger(floorNumber) || floorNumber < 0) {
-      setFormError("Please select a valid floor.");
+      setFormError("Please enter a valid floor.");
       return;
     }
 
@@ -153,10 +164,7 @@ export default function RoomsPage() {
       });
 
       setAddOpen(false);
-      setNewRoom({
-        ...EMPTY_ROOM,
-        hostel,
-      });
+      setNewRoom({ ...EMPTY_ROOM, hostel });
       setFormError("");
 
       await load();
@@ -169,10 +177,7 @@ export default function RoomsPage() {
 
   const openAddDialog = () => {
     setFormError("");
-    setNewRoom({
-      ...EMPTY_ROOM,
-      hostel,
-    });
+    setNewRoom({ ...EMPTY_ROOM, hostel });
     setAddOpen(true);
   };
 
@@ -180,26 +185,16 @@ export default function RoomsPage() {
     const occupied = Number(room.occupied || 0);
     const capacity = Number(room.capacity || 0);
 
-    if (capacity > 0 && occupied >= capacity) {
-      return "Full";
-    }
-
-    if (occupied > 0) {
-      return "Partially occupied";
-    }
-
+    if (capacity > 0 && occupied >= capacity) return "Full";
+    if (occupied > 0) return "Partially occupied";
     return "Available";
   };
 
   const getStatusClass = (status) => {
-    if (status === "Full") {
-      return "bg-red-100 text-red-700";
-    }
-
+    if (status === "Full") return "bg-red-100 text-red-700";
     if (status === "Partially occupied") {
       return "bg-amber-100 text-amber-700";
     }
-
     return "bg-green-100 text-green-700";
   };
 
@@ -210,7 +205,7 @@ export default function RoomsPage() {
         description="Manage hostel rooms, occupancy and bed availability."
       />
 
-      {/* Hostel tabs and add room */}
+      {/* Hostel tabs */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <Tabs
           value={hostel}
@@ -280,7 +275,7 @@ export default function RoomsPage() {
         </div>
       </div>
 
-      {/* Occupancy progress */}
+      {/* Occupancy */}
       <div className="rounded-xl border bg-card p-5">
         <div className="mb-3 flex items-center justify-between">
           <div>
@@ -347,7 +342,7 @@ export default function RoomsPage() {
         </Select>
       </div>
 
-      {/* Error state */}
+      {/* Error */}
       {error && (
         <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           <p>{error}</p>
@@ -427,7 +422,9 @@ export default function RoomsPage() {
 
                 <div className="mt-5">
                   <div className="mb-2 flex justify-between text-sm">
-                    <span className="text-muted-foreground">Bed occupancy</span>
+                    <span className="text-muted-foreground">
+                      Bed occupancy
+                    </span>
                     <span className="font-medium">
                       {occupied}/{capacity}
                     </span>
@@ -602,18 +599,21 @@ export default function RoomsPage() {
                       {selectedRoom.floor ?? 0}
                     </p>
                   </div>
+
                   <div className="rounded-lg bg-muted p-4">
                     <p className="text-xs text-muted-foreground">Block</p>
                     <p className="mt-1 text-lg font-semibold">
                       {selectedRoom.block || "A"}
                     </p>
                   </div>
+
                   <div className="rounded-lg bg-muted p-4">
                     <p className="text-xs text-muted-foreground">Capacity</p>
                     <p className="mt-1 text-lg font-semibold">
                       {selectedRoom.capacity}
                     </p>
                   </div>
+
                   <div className="rounded-lg bg-muted p-4">
                     <p className="text-xs text-muted-foreground">Occupied</p>
                     <p className="mt-1 text-lg font-semibold">
@@ -638,6 +638,7 @@ export default function RoomsPage() {
                       %
                     </span>
                   </div>
+
                   <Progress
                     value={
                       selectedRoom.capacity
