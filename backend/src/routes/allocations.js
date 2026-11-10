@@ -34,6 +34,7 @@ router.get("/", async (req, res, next) => {
 /** Assign a student to a room. */
 router.post("/", async (req, res, next) => {
   let insertedAllocationId = null;
+  let studentWasLinked = false;
   try {
     const { student_id, room_id } = req.body || {};
     if (!student_id || !room_id) {
@@ -93,12 +94,20 @@ router.post("/", async (req, res, next) => {
     if (allocationError) throw allocationError;
     insertedAllocationId = allocation.id;
 
-    const { error: studentUpdateError } = await admin
+    const { data: linkedStudent, error: studentUpdateError } = await admin
       .from("students")
       .update({ room_id })
       .eq("id", student_id)
-      .is("room_id", null);
+      .is("room_id", null)
+      .select("id")
+      .maybeSingle();
     if (studentUpdateError) throw studentUpdateError;
+    if (!linkedStudent) {
+      await admin.from("allocations").delete().eq("id", insertedAllocationId);
+      insertedAllocationId = null;
+      return fail(res, 409, "This student was assigned to another room just now. Refresh and try again.");
+    }
+    studentWasLinked = true;
 
     const newOccupied = (count || 0) + 1;
     const { error: roomUpdateError } = await admin
@@ -113,6 +122,9 @@ router.post("/", async (req, res, next) => {
     res.status(201).json({ data: allocation, success: true });
   } catch (err) {
     // Compensate if a later write fails, so a half-created allocation is not left behind.
+    if (studentWasLinked) {
+      await req.supabaseAdmin.from("students").update({ room_id: null }).eq("id", req.body?.student_id).eq("room_id", req.body?.room_id);
+    }
     if (insertedAllocationId) {
       await req.supabaseAdmin.from("allocations").delete().eq("id", insertedAllocationId);
     }
