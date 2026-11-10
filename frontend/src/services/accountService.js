@@ -79,3 +79,6 @@ export const resendInvite = async (id) =>
 
 export const deactivateAccount = async (id) =>
   apiRequest(`/accounts/${id}/deactivate`, { method: "POST" });
+
+export const permanentlyDeleteAccount = async (id) =>
+  apiRequest(`/accounts/${encodeURIComponent(id)}`, { method: "DELETE" });
