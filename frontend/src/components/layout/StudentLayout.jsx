@@ -25,6 +25,7 @@ export default function StudentLayout() {
       subtitle="Student Portal"
       user={user || record.full_name || "Student"}
       role={`${record.department || "Student"} · ${record.year || ""}`}
+      showNotifications
       onLogout={async () => {
         await logout();
         navigate("/login");
