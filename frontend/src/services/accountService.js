@@ -15,7 +15,40 @@ export const getAccounts = async ({
   if (role) params.set("role", role);
   if (status) params.set("status", status);
 
-  return apiRequest(`/accounts?${params.toString()}`);
+  const result = await apiRequest(`/accounts?${params.toString()}`);
+
+  // Compatibility with an older backend deployment that returns only
+  // { data: [...] } and does not yet support server-side filters/pagination.
+  // In that case, filter the returned account set in the browser so the
+  // dropdowns still work instead of silently showing every account.
+  if (!result?.pagination) {
+    let accounts = Array.isArray(result?.data) ? result.data : [];
+    const normalizedSearch = search.trim().toLowerCase();
+
+    if (normalizedSearch) {
+      accounts = accounts.filter((account) =>
+        [account.full_name, account.email, account.username, account.id]
+          .some((value) => String(value || "").toLowerCase().includes(normalizedSearch))
+      );
+    }
+    if (role) accounts = accounts.filter((account) => account.role === role);
+    if (status) accounts = accounts.filter((account) => account.status === status);
+
+    const total = accounts.length;
+    const start = (page - 1) * perPage;
+    return {
+      data: accounts.slice(start, start + perPage),
+      pagination: {
+        page,
+        perPage,
+        total,
+        hasMore: start + perPage < total,
+        totalPages: Math.max(1, Math.ceil(total / perPage)),
+      },
+    };
+  }
+
+  return result;
 };
 
 export const createStudentAccount = async (payload) =>
