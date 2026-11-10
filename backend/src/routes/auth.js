@@ -14,6 +14,50 @@ import { extractRole, extractHostelScope } from "../middleware/authorize.js";
 
 const SUPER_ADMIN_EMAIL = "shreyankvy@gmail.com";
 
+/**
+ * Resolve the student record for an Auth user.
+ * Older student records may predate auth_id linking. In that case, link only
+ * an unclaimed row whose email (and USN when present) uniquely matches.
+ */
+async function getLinkedStudentRecord(admin, user) {
+  const columns = "*, rooms(room_number)";
+  const { data: linked, error: linkedError } = await admin
+    .from("students")
+    .select(columns)
+    .eq("auth_id", user.id)
+    .maybeSingle();
+  if (linkedError) throw linkedError;
+  if (linked) return linked;
+
+  const email = String(user.email || "").trim().toLowerCase();
+  const usn = String(user.user_metadata?.usn || "").trim().toUpperCase();
+  if (!email) return null;
+
+  let lookup = admin
+    .from("students")
+    .select("id, auth_id")
+    .ilike("email", email)
+    .is("auth_id", null);
+
+  if (usn) lookup = lookup.ilike("usn", usn);
+
+  const { data: matches, error: lookupError } = await lookup.limit(2);
+  if (lookupError) throw lookupError;
+  if (!matches || matches.length !== 1) return null;
+
+  const { data: linkedRow, error: linkError } = await admin
+    .from("students")
+    .update({ auth_id: user.id })
+    .eq("id", matches[0].id)
+    .is("auth_id", null)
+    .select(columns)
+    .maybeSingle();
+
+  if (linkError) throw linkError;
+  return linkedRow || null;
+}
+
+
 // ── Public router (no auth required) ────────────────────────
 
 export const publicRouter = Router();
@@ -85,16 +129,10 @@ publicRouter.post("/login", async (req, res, next) => {
       user_metadata: user.user_metadata,
     });
 
-    // Look up student record if student role
-    let studentRecord = null;
-    if (role === "student") {
-      const { data: sData } = await admin
-        .from("students")
-        .select("*, rooms(room_number)")
-        .eq("auth_id", user.id)
-        .maybeSingle();
-      studentRecord = sData;
-    }
+    // Resolve linked student record, including safe backfill for older accounts.
+    const studentRecord = role === "student"
+      ? await getLinkedStudentRecord(admin, user)
+      : null;
 
     res.json({
       session: {
@@ -146,15 +184,9 @@ protectedRouter.get("/me", async (req, res, next) => {
       user_metadata: user.user_metadata,
     });
 
-    let studentRecord = null;
-    if (role === "student") {
-      const { data: sData } = await admin
-        .from("students")
-        .select("*, rooms(room_number)")
-        .eq("auth_id", user.id)
-        .maybeSingle();
-      studentRecord = sData;
-    }
+    const studentRecord = role === "student"
+      ? await getLinkedStudentRecord(admin, user)
+      : null;
 
     res.json({
       role: role || "unknown",
