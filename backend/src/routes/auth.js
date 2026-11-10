@@ -13,6 +13,49 @@ import { getAdminClient } from "../lib/supabase.js";
 import { extractRole, extractHostelScope } from "../middleware/authorize.js";
 
 const SUPER_ADMIN_EMAIL = "shreyankvy@gmail.com";
+// Process-local login throttling: three failed attempts trigger a 30 seconds cooldown.
+const LOGIN_FAILURE_LIMIT = 3;
+const LOGIN_LOCK_MS = 30_000;
+const loginAttempts = new Map();
+
+function loginAttemptKey(req, identifier) {
+  return String(req.ip || req.socket?.remoteAddress || "unknown") + ":" + String(identifier || "").trim().toLowerCase();
+}
+
+function clearExpiredLoginAttempts(now = Date.now()) {
+  for (const [key, state] of loginAttempts) {
+    if ((!state.lockUntil && now - state.lastFailureAt > 15 * 60_000) || (state.lockUntil && state.lockUntil <= now)) loginAttempts.delete(key);
+  }
+}
+
+function rejectIfLoginLocked(req, res, identifier) {
+  clearExpiredLoginAttempts();
+  const state = loginAttempts.get(loginAttemptKey(req, identifier));
+  const retryAfter = state?.lockUntil ? Math.ceil((state.lockUntil - Date.now()) / 1000) : 0;
+  if (retryAfter > 0) {
+    res.set("Retry-After", String(retryAfter));
+    res.status(429).json({ error: { message: "Too many failed login attempts. Please wait before trying again." }, retryAfter });
+    return true;
+  }
+  return false;
+}
+
+function recordFailedLogin(req, res, identifier) {
+  const key = loginAttemptKey(req, identifier);
+  const state = loginAttempts.get(key) || { failures: 0 };
+  state.failures += 1;
+  state.lastFailureAt = Date.now();
+  if (state.failures >= LOGIN_FAILURE_LIMIT) {
+    state.lockUntil = Date.now() + LOGIN_LOCK_MS;
+    loginAttempts.set(key, state);
+    res.set("Retry-After", "30");
+    res.status(429).json({ error: { message: "Three login attempts failed. Please wait 30 seconds before trying again." }, retryAfter: 30 });
+    return true;
+  }
+  loginAttempts.set(key, state);
+  return false;
+}
+
 
 /**
  * Resolve the student record for an Auth user.
@@ -81,6 +124,8 @@ publicRouter.post("/login", async (req, res, next) => {
       });
     }
 
+    if (rejectIfLoginLocked(req, res, identifier)) return;
+
     // Create admin client directly — NOT from req (we're pre-auth)
     const admin = getAdminClient();
 
@@ -96,6 +141,7 @@ publicRouter.post("/login", async (req, res, next) => {
         .maybeSingle();
 
       if (studentErr || !student?.auth_id || student.status !== "active") {
+        if (recordFailedLogin(req, res, identifier)) return;
         return res.status(401).json({
           error: { message: "Invalid credentials. Please check your ID and password." },
         });
@@ -105,6 +151,7 @@ publicRouter.post("/login", async (req, res, next) => {
         await admin.auth.admin.getUserById(student.auth_id);
 
       if (authUserErr || !authUser?.user?.email) {
+        if (recordFailedLogin(req, res, identifier)) return;
         return res.status(401).json({
           error: { message: "Invalid credentials. Please check your ID and password." },
         });
@@ -117,10 +164,13 @@ publicRouter.post("/login", async (req, res, next) => {
       await admin.auth.signInWithPassword({ email, password });
 
     if (signInErr) {
+      if (recordFailedLogin(req, res, identifier)) return;
       return res.status(401).json({
         error: { message: "Invalid credentials. Please check your email and password." },
       });
     }
+
+    loginAttempts.delete(loginAttemptKey(req, identifier));
 
     const user = signInData.user;
     const session = signInData.session;
