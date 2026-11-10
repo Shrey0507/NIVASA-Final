@@ -69,6 +69,7 @@ export function AuthProvider({ children }) {
       setAuth({
         isAuthenticated: true,
         loading: false,
+        userId: session.user?.id || null,
         role: displayRole,
         serverRole,
         hostel: me.hostel || null,
