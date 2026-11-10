@@ -1,7 +1,22 @@
 import { apiRequest } from "@/lib/apiClient";
 
-export const getAccounts = async ({ page = 1, perPage = 25 } = {}) =>
-  apiRequest(`/accounts?page=${page}&perPage=${perPage}`);
+export const getAccounts = async ({
+  page = 1,
+  perPage = 25,
+  search = "",
+  role = "",
+  status = "",
+} = {}) => {
+  const params = new URLSearchParams({
+    page: String(page),
+    perPage: String(perPage),
+  });
+  if (search) params.set("search", search);
+  if (role) params.set("role", role);
+  if (status) params.set("status", status);
+
+  return apiRequest(`/accounts?${params.toString()}`);
+};
 
 export const createStudentAccount = async (payload) =>
   (await apiRequest("/accounts/students", {
