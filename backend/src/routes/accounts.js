@@ -214,6 +214,72 @@ router.post("/admins", requireSuperAdmin, async (req, res, next) => {
   }
 });
 
+/**
+ * DELETE /api/accounts/:id — permanently delete an account.
+ * Super-admin only. For students, also removes the linked student row and
+ * dependent records configured with ON DELETE CASCADE.
+ */
+router.delete("/:id", requireSuperAdmin, async (req, res, next) => {
+  try {
+    const accountId = req.params.id;
+
+    if (accountId === req.userId) {
+      return res.status(400).json({
+        error: { message: "You cannot permanently delete your own account." },
+      });
+    }
+
+    const admin = req.supabaseAdmin;
+    const { data: targetResult, error: targetError } =
+      await admin.auth.admin.getUserById(accountId);
+    if (targetError) throw targetError;
+
+    const target = targetResult.user;
+    const targetRole = target.app_metadata?.role || target.user_metadata?.role;
+    if (targetRole === "super_admin") {
+      return res.status(400).json({
+        error: { message: "A super-admin account cannot be permanently deleted from this screen." },
+      });
+    }
+
+    // Remove the Auth identity first. The students.auth_id FK is ON DELETE SET NULL,
+    // so student data remains intact if the following cleanup needs manual recovery.
+    const { error: deleteAuthError } = await admin.auth.admin.deleteUser(accountId);
+    if (deleteAuthError) throw deleteAuthError;
+
+    if (targetRole === "student") {
+      const { data: linkedStudent, error: studentLookupError } = await admin
+        .from("students")
+        .select("id")
+        .eq("auth_id", accountId)
+        .maybeSingle();
+      if (studentLookupError) throw studentLookupError;
+
+      if (linkedStudent?.id) {
+        const { error: studentDeleteError } = await admin
+          .from("students")
+          .delete()
+          .eq("id", linkedStudent.id);
+        if (studentDeleteError) {
+          console.error("[ACCOUNT_DELETE_PARTIAL]", {
+            accountId,
+            message: studentDeleteError.message,
+          });
+          return res.status(500).json({
+            error: {
+              message: "The login was deleted, but the linked student record could not be removed. Please contact the system administrator to finish cleanup.",
+            },
+          });
+        }
+      }
+    }
+
+    res.json({ success: true, deleted: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
 /** POST /api/accounts/:id/resend-invite — SUPER_ADMIN ONLY */
 router.post("/:id/resend-invite", requireSuperAdmin, async (req, res, next) => {
   try {
