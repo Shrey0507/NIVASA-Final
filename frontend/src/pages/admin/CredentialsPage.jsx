@@ -77,7 +77,7 @@ export default function CredentialsPage() {
 
   const permanentlyRemoveAccount = async (account) => {
     const confirmation = window.prompt(
-      `PERMANENTLY DELETE ${account.full_name || account.email}? This cannot be undone. This removes the login and, for student accounts, the linked student record and dependent records. Type DELETE to confirm.`
+      `Delete ${account.full_name || account.email} permanently? This cannot be undone. Type DELETE to confirm.`
     );
     if (confirmation !== "DELETE") return;
 
