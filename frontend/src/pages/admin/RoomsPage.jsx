@@ -83,6 +83,7 @@ export default function RoomsPage() {
       });
 
       setRooms(Array.isArray(data) ? data : []);
+      setSelectedRoom((current) => current ? (data.find((item) => item.id === current.id) || current) : current);
     } catch (err) {
       setError(err.message || "Unable to load rooms.");
     } finally {
@@ -110,7 +111,7 @@ export default function RoomsPage() {
         setAllocationError("");
         const [assignments, students] = await Promise.all([
           getRoomAllocations(selectedRoom.id),
-          getStudents({ hostel: selectedRoom.hostel, limit: 200 }),
+          getStudents({ hostel: selectedRoom.hostel, limit: 1000 }),
         ]);
         if (cancelled) return;
         setRoomAllocations(assignments);
@@ -675,7 +676,7 @@ export default function RoomsPage() {
           if (!open) setSelectedRoom(null);
         }}
       >
-        <DialogContent className="sm:max-w-[450px]">
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[560px]">
           {selectedRoom && (
             <>
               <DialogHeader>
