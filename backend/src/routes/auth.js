@@ -14,6 +14,50 @@ import { extractRole, extractHostelScope } from "../middleware/authorize.js";
 
 const SUPER_ADMIN_EMAIL = "shreyankvy@gmail.com";
 
+/**
+ * Resolve the student record for an Auth user.
+ * Older student records may predate auth_id linking. In that case, link only
+ * an unclaimed row whose email (and USN when present) uniquely matches.
+ */
+async function getLinkedStudentRecord(admin, user) {
+  const columns = "*, rooms(room_number, block)";
+  const { data: linked, error: linkedError } = await admin
+    .from("students")
+    .select(columns)
+    .eq("auth_id", user.id)
+    .maybeSingle();
+  if (linkedError) throw linkedError;
+  if (linked) return linked;
+
+  const email = String(user.email || "").trim().toLowerCase();
+  const usn = String(user.user_metadata?.usn || "").trim().toUpperCase();
+  if (!email) return null;
+
+  let lookup = admin
+    .from("students")
+    .select("id, auth_id")
+    .ilike("email", email)
+    .is("auth_id", null);
+
+  if (usn) lookup = lookup.ilike("usn", usn);
+
+  const { data: matches, error: lookupError } = await lookup.limit(2);
+  if (lookupError) throw lookupError;
+  if (!matches || matches.length !== 1) return null;
+
+  const { data: linkedRow, error: linkError } = await admin
+    .from("students")
+    .update({ auth_id: user.id })
+    .eq("id", matches[0].id)
+    .is("auth_id", null)
+    .select(columns)
+    .maybeSingle();
+
+  if (linkError) throw linkError;
+  return linkedRow || null;
+}
+
+
 // ── Public router (no auth required) ────────────────────────
 
 export const publicRouter = Router();
@@ -30,19 +74,44 @@ export const publicRouter = Router();
  */
 publicRouter.post("/login", async (req, res, next) => {
   try {
-    const { identifier, password } = req.body;
-    if (!identifier || !password) {
+    const { identifier, password, mode } = req.body;
+    if (!identifier || !password || !["admin", "student"].includes(mode)) {
       return res.status(400).json({
-        error: { message: "Email/username and password are required." },
+        error: { message: "Email/username, password, and a valid login type are required." },
       });
     }
 
     // Create admin client directly — NOT from req (we're pre-auth)
     const admin = getAdminClient();
 
-    const email = identifier.includes("@")
-      ? identifier.trim().toLowerCase()
-      : identifier.trim();
+    let email = identifier.trim().toLowerCase();
+
+    // Student accounts may sign in with their USN. Resolve the USN to the
+    // linked Auth user on the server; never expose this lookup to the client.
+    if (!email.includes("@")) {
+      const { data: student, error: studentErr } = await admin
+        .from("students")
+        .select("auth_id, status")
+        .ilike("usn", identifier.trim())
+        .maybeSingle();
+
+      if (studentErr || !student?.auth_id || student.status !== "active") {
+        return res.status(401).json({
+          error: { message: "Invalid credentials. Please check your ID and password." },
+        });
+      }
+
+      const { data: authUser, error: authUserErr } =
+        await admin.auth.admin.getUserById(student.auth_id);
+
+      if (authUserErr || !authUser?.user?.email) {
+        return res.status(401).json({
+          error: { message: "Invalid credentials. Please check your ID and password." },
+        });
+      }
+
+      email = authUser.user.email.toLowerCase();
+    }
 
     const { data: signInData, error: signInErr } =
       await admin.auth.signInWithPassword({ email, password });
@@ -60,16 +129,24 @@ publicRouter.post("/login", async (req, res, next) => {
       user_metadata: user.user_metadata,
     });
 
-    // Look up student record if student role
-    let studentRecord = null;
-    if (role === "student") {
-      const { data: sData } = await admin
-        .from("students")
-        .select("*, rooms(room_number)")
-        .eq("auth_id", user.id)
-        .maybeSingle();
-      studentRecord = sData;
+    // Enforce the selected login portal on the server. A valid password alone
+    // must never allow an admin account into the student portal (or vice versa).
+    const isStudentAccount = role === "student";
+    const isAdminAccount = ["super_admin", "boys_admin", "girls_admin"].includes(role);
+    if ((mode === "student" && !isStudentAccount) || (mode === "admin" && !isAdminAccount)) {
+      return res.status(403).json({
+        error: {
+          message: mode === "student"
+            ? "This is an administrator account. Please use the Admin login."
+            : "This is a student account. Please use the Student login.",
+        },
+      });
     }
+
+    // Resolve linked student record, including safe backfill for older accounts.
+    const studentRecord = role === "student"
+      ? await getLinkedStudentRecord(admin, user)
+      : null;
 
     res.json({
       session: {
@@ -121,15 +198,9 @@ protectedRouter.get("/me", async (req, res, next) => {
       user_metadata: user.user_metadata,
     });
 
-    let studentRecord = null;
-    if (role === "student") {
-      const { data: sData } = await admin
-        .from("students")
-        .select("*, rooms(room_number)")
-        .eq("auth_id", user.id)
-        .maybeSingle();
-      studentRecord = sData;
-    }
+    const studentRecord = role === "student"
+      ? await getLinkedStudentRecord(admin, user)
+      : null;
 
     res.json({
       role: role || "unknown",

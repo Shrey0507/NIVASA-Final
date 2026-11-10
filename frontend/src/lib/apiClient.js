@@ -8,7 +8,15 @@ export async function apiRequest(path, options = {}) {
   if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
 
   const response = await fetch(`${API_URL}${path}`, { ...options, headers });
-  const payload = await response.json().catch(() => null);
+  const responseText = await response.text();
+  let payload = null;
+  if (responseText) {
+    try {
+      payload = JSON.parse(responseText);
+    } catch {
+      payload = null;
+    }
+  }
 
   // Handle authentication failure — sign out and redirect
   if (response.status === 401) {
@@ -22,7 +30,13 @@ export async function apiRequest(path, options = {}) {
   }
 
   if (!response.ok) {
-    throw new Error(payload?.error?.message || payload?.error || "Request failed");
+    const message =
+      payload?.error?.message ||
+      payload?.message ||
+      (typeof payload?.error === "string" ? payload.error : null) ||
+      (responseText && responseText.length < 300 ? responseText : null) ||
+      `Request failed (HTTP ${response.status})`;
+    throw new Error(message);
   }
 
   return payload;

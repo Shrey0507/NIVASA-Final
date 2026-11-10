@@ -6,9 +6,12 @@ import {
   Users,
   Building2,
   CheckCircle2,
+  UserPlus,
+  UserRoundX,
+  RefreshCw,
 } from "lucide-react";
 
-import { getRooms, createRoom } from "@/services/adminService";
+import { getRooms, createRoom, getStudents, getRoomAllocations, allocateRoom, deallocateRoom } from "@/services/adminService";
 import { PageHeader } from "@/components/common/PageHeader";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -58,6 +61,13 @@ export default function RoomsPage() {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
   const [newRoom, setNewRoom] = useState(EMPTY_ROOM);
+  const [roomAllocations, setRoomAllocations] = useState([]);
+  const [eligibleStudents, setEligibleStudents] = useState([]);
+  const [studentSearch, setStudentSearch] = useState("");
+  const [selectedStudentId, setSelectedStudentId] = useState("");
+  const [allocationLoading, setAllocationLoading] = useState(false);
+  const [allocationSaving, setAllocationSaving] = useState(false);
+  const [allocationError, setAllocationError] = useState("");
 
   const load = useCallback(async () => {
     try {
@@ -73,6 +83,7 @@ export default function RoomsPage() {
       });
 
       setRooms(Array.isArray(data) ? data : []);
+      setSelectedRoom((current) => current ? (data.find((item) => item.id === current.id) || current) : current);
     } catch (err) {
       setError(err.message || "Unable to load rooms.");
     } finally {
@@ -83,6 +94,38 @@ export default function RoomsPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    if (!selectedRoom) {
+      setRoomAllocations([]);
+      setEligibleStudents([]);
+      setSelectedStudentId("");
+      setStudentSearch("");
+      setAllocationError("");
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        setAllocationLoading(true);
+        setAllocationError("");
+        const [assignments, students] = await Promise.all([
+          getRoomAllocations(selectedRoom.id),
+          getStudents({ hostel: selectedRoom.hostel, limit: 1000 }),
+        ]);
+        if (cancelled) return;
+        setRoomAllocations(assignments);
+        setEligibleStudents((students || []).filter((student) =>
+          student.status === "active" && !student.roomId && !student.room_id
+        ));
+      } catch (err) {
+        if (!cancelled) setAllocationError(err.message || "Unable to load room assignments.");
+      } finally {
+        if (!cancelled) setAllocationLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [selectedRoom?.id, selectedRoom?.hostel]);
 
   const summary = useMemo(() => {
     const total = rooms.length;
@@ -178,6 +221,61 @@ export default function RoomsPage() {
     setFormError("");
     setNewRoom({ ...EMPTY_ROOM, hostel });
     setAddOpen(true);
+  };
+
+  const filteredEligibleStudents = eligibleStudents.filter((student) => {
+    const term = studentSearch.trim().toLowerCase();
+    return !term || [student.fullName, student.full_name, student.usn, student.email]
+      .some((value) => String(value || "").toLowerCase().includes(term));
+  });
+
+  const refreshAssignments = async () => {
+    if (!selectedRoom) return;
+    try {
+      setAllocationLoading(true);
+      const [assignments, students] = await Promise.all([
+        getRoomAllocations(selectedRoom.id),
+        getStudents({ hostel: selectedRoom.hostel, limit: 200 }),
+      ]);
+      setRoomAllocations(assignments);
+      setEligibleStudents((students || []).filter((student) =>
+        student.status === "active" && !student.roomId && !student.room_id
+      ));
+      await load();
+    } catch (err) {
+      setAllocationError(err.message || "Unable to refresh assignments.");
+    } finally {
+      setAllocationLoading(false);
+    }
+  };
+
+  const handleAssignStudent = async () => {
+    if (!selectedRoom || !selectedStudentId) return;
+    try {
+      setAllocationSaving(true);
+      setAllocationError("");
+      await allocateRoom(selectedStudentId, selectedRoom.id);
+      setSelectedStudentId("");
+      await refreshAssignments();
+    } catch (err) {
+      setAllocationError(err.message || "Unable to assign student.");
+    } finally {
+      setAllocationSaving(false);
+    }
+  };
+
+  const handleDeallocateStudent = async (allocationId) => {
+    if (!window.confirm("Remove this student's room assignment?")) return;
+    try {
+      setAllocationSaving(true);
+      setAllocationError("");
+      await deallocateRoom(allocationId);
+      await refreshAssignments();
+    } catch (err) {
+      setAllocationError(err.message || "Unable to remove room assignment.");
+    } finally {
+      setAllocationSaving(false);
+    }
   };
 
   const getRoomStatus = (room) => {
@@ -578,7 +676,7 @@ export default function RoomsPage() {
           if (!open) setSelectedRoom(null);
         }}
       >
-        <DialogContent className="sm:max-w-[450px]">
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[560px]">
           {selectedRoom && (
             <>
               <DialogHeader>
@@ -618,6 +716,52 @@ export default function RoomsPage() {
                     <p className="mt-1 text-lg font-semibold">
                       {selectedRoom.occupied || 0}
                     </p>
+                  </div>
+                </div>
+
+                <div className="space-y-3 rounded-lg border p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <h4 className="font-semibold">Assigned students</h4>
+                      <p className="text-xs text-muted-foreground">{roomAllocations.length} of {selectedRoom.capacity} beds occupied</p>
+                    </div>
+                    <Button size="sm" variant="outline" onClick={refreshAssignments} disabled={allocationLoading || allocationSaving}>
+                      <RefreshCw className="mr-2 h-3.5 w-3.5" /> Refresh
+                    </Button>
+                  </div>
+                  {allocationLoading ? <p className="text-sm text-muted-foreground">Loading assignments...</p> :
+                    roomAllocations.length ? (
+                      <div className="max-h-48 space-y-2 overflow-y-auto">
+                        {roomAllocations.map((allocation) => {
+                          const assigned = allocation.students || {};
+                          return <div key={allocation.id} className="flex items-center justify-between gap-3 rounded-md bg-muted/60 p-3">
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-medium">{assigned.full_name || "Student"}</p>
+                              <p className="truncate text-xs text-muted-foreground">{assigned.usn || assigned.email || "—"}</p>
+                            </div>
+                            <Button size="sm" variant="ghost" className="shrink-0 text-destructive" disabled={allocationSaving} onClick={() => handleDeallocateStudent(allocation.id)}>
+                              <UserRoundX className="mr-1 h-4 w-4" /> Remove
+                            </Button>
+                          </div>;
+                        })}
+                      </div>
+                    ) : <p className="text-sm text-muted-foreground">No students assigned to this room yet.</p>}
+                  <div className="space-y-2 border-t pt-3">
+                    <h4 className="text-sm font-semibold">Assign a student</h4>
+                    <Input value={studentSearch} onChange={(event) => setStudentSearch(event.target.value)} placeholder="Search eligible students by name, USN or email" />
+                    <Select value={selectedStudentId} onValueChange={setSelectedStudentId}>
+                      <SelectTrigger><SelectValue placeholder={filteredEligibleStudents.length ? "Choose an unassigned student" : "No eligible students"} /></SelectTrigger>
+                      <SelectContent>
+                        {filteredEligibleStudents.map((student) => <SelectItem key={student.id} value={student.id}>
+                          {(student.fullName || student.full_name || "Unnamed")} · {student.usn || student.email || "No USN"}
+                        </SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <Button className="w-full" onClick={handleAssignStudent} disabled={!selectedStudentId || allocationSaving || allocationLoading || roomAllocations.length >= Number(selectedRoom.capacity)}>
+                      <UserPlus className="mr-2 h-4 w-4" />{allocationSaving ? "Saving..." : "Assign student"}
+                    </Button>
+                    {roomAllocations.length >= Number(selectedRoom.capacity) && <p className="text-xs text-amber-600">This room is full.</p>}
+                    {allocationError && <p className="text-sm text-destructive">{allocationError}</p>}
                   </div>
                 </div>
 

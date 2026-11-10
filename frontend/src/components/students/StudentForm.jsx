@@ -39,6 +39,7 @@ const EMPTY = {
   guardianName: "",
   guardianPhone: "",
   hostelType: "boys",
+  password: "",
 };
 
 export default function StudentForm({ open, student, onClose }) {
@@ -67,6 +68,10 @@ export default function StudentForm({ open, student, onClose }) {
       next.phone = "Must be 10 digits";
     if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email))
       next.email = "Invalid email format";
+    if (!student && form.password && form.password.length < 8)
+      next.password = "Password must be at least 8 characters";
+    if (!student && form.password && !form.email)
+      next.email = "Email is required when creating login credentials";
     if (!form.guardianName.trim())
       next.guardianName = "Guardian name is required";
     if (!form.guardianPhone.trim())
@@ -166,6 +171,21 @@ export default function StudentForm({ open, student, onClose }) {
               />
             </Field>
           </div>
+
+          {!student && (
+            <Field label="Initial student password (optional)" error={errors.password}>
+              <Input
+                type="password"
+                autoComplete="new-password"
+                value={form.password}
+                onChange={(e) => update("password", e.target.value)}
+                placeholder="At least 8 characters"
+              />
+              <p className="text-xs text-muted-foreground">
+                Leave blank to create a student record without login access. Provide a password to create the student account immediately.
+              </p>
+            </Field>
+          )}
 
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Guardian name" error={errors.guardianName}>

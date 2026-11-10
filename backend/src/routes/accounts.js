@@ -16,15 +16,32 @@ const router = Router();
 /** GET /api/accounts — list all managed accounts */
 router.get("/", async (req, res, next) => {
   try {
-    // Use Supabase Auth admin API to list users
-    const { data, error } = await req.supabaseAdmin.auth.admin.listUsers({
-      page: 1,
-      perPage: 100,
-    });
-    if (error) throw error;
+    const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+    const perPage = Math.min(100, Math.max(1, Number.parseInt(req.query.perPage, 10) || 25));
+    const search = String(req.query.search || "").trim().toLowerCase();
+    const roleFilter = String(req.query.role || "").trim();
+    const statusFilter = String(req.query.status || "").trim();
+    const admin = req.supabaseAdmin;
 
-    // Map to safe output — never expose tokens/secrets
-    const accounts = (data?.users || []).map((u) => ({
+    // Search/filter across all Auth pages so a user is discoverable even
+    // when they are not on the currently displayed page.
+    const users = [];
+    if (search || roleFilter || statusFilter || req.hostelScope) {
+      let authPage = 1;
+      while (authPage <= 100) {
+        const { data, error } = await admin.auth.admin.listUsers({ page: authPage, perPage: 100 });
+        if (error) throw error;
+        users.push(...(data?.users || []));
+        if (!data?.nextPage || !(data?.users || []).length) break;
+        authPage += 1;
+      }
+    } else {
+      const { data, error } = await admin.auth.admin.listUsers({ page, perPage });
+      if (error) throw error;
+      users.push(...(data?.users || []));
+    }
+
+    let accounts = users.map((u) => ({
       id: u.id,
       email: u.email,
       full_name: u.user_metadata?.full_name || u.email,
@@ -35,7 +52,32 @@ router.get("/", async (req, res, next) => {
       created_at: u.created_at,
     }));
 
-    res.json({ data: accounts });
+    if (req.hostelScope) {
+      accounts = accounts.filter((account) =>
+        account.role === "student"
+          ? account.hostel === req.hostelScope
+          : account.role === (req.hostelScope === "boys" ? "boys_admin" : "girls_admin")
+      );
+    }
+    if (search) {
+      accounts = accounts.filter((a) =>
+        [a.full_name, a.email, a.username, a.id].some((v) => String(v || "").toLowerCase().includes(search))
+      );
+    }
+    if (roleFilter) accounts = accounts.filter((a) => a.role === roleFilter);
+    if (statusFilter) accounts = accounts.filter((a) => a.status === statusFilter);
+
+    const total = accounts.length;
+    const startIndex = (page - 1) * perPage;
+    const data = accounts.slice(startIndex, startIndex + perPage);
+    res.json({
+      data,
+      pagination: {
+        page, perPage, total,
+        hasMore: startIndex + perPage < total,
+        totalPages: Math.max(1, Math.ceil(total / perPage)),
+      },
+    });
   } catch (err) {
     next(err);
   }
@@ -47,16 +89,22 @@ router.get("/", async (req, res, next) => {
  * Hostel-scoped admins can only create students for their own hostel.
  */
 router.post("/students", async (req, res, next) => {
+  let createdUserId = null;
   try {
-    const { email, password, full_name, usn, hostel } = req.body;
-    if (!email || !full_name) {
+    const { email, password, full_name, usn, hostel, phone, department, year, semester, guardian_name, guardian_phone, address } = req.body;
+    if (!email || !full_name || !usn || !password) {
       return res.status(400).json({
-        error: { message: "Email and full_name are required." },
+        error: { message: "Full name, email, student ID / USN, and password are required." },
       });
     }
+    if (String(password).length < 8) {
+      return res.status(400).json({ error: { message: "Password must be at least 8 characters." } });
+    }
 
-    // Enforce hostel scope: non-super admins can only create for their hostel
     const targetHostel = hostel || "boys";
+    if (!["boys", "girls"].includes(targetHostel)) {
+      return res.status(400).json({ error: { message: "Choose a valid hostel." } });
+    }
     if (req.hostelScope && req.hostelScope !== targetHostel) {
       return res.status(403).json({
         error: { message: `You can only create students for the ${req.hostelScope} hostel.` },
@@ -64,19 +112,66 @@ router.post("/students", async (req, res, next) => {
     }
 
     const admin = req.supabaseAdmin;
+    const normalizedEmail = String(email).trim().toLowerCase();
+    const normalizedUsn = String(usn).trim().toUpperCase();
 
-    const { data: authUser, error: authErr } =
-      await admin.auth.admin.createUser({
-        email: email.trim().toLowerCase(),
-        password: password || undefined,
-        email_confirm: true,
-        user_metadata: { full_name, usn },
-        app_metadata: { role: "student", hostel: targetHostel },
-      });
-    if (authErr) throw authErr;
+    const { data: existingStudent, error: lookupError } = await admin
+      .from("students").select("id").ilike("usn", normalizedUsn).maybeSingle();
+    if (lookupError) throw lookupError;
+    if (existingStudent) {
+      return res.status(409).json({ error: { message: "A student with this ID / USN already exists." } });
+    }
 
-    res.status(201).json({ account: authUser.user });
+    const { data: authResult, error: authError } = await admin.auth.admin.createUser({
+      email: normalizedEmail,
+      password,
+      email_confirm: true,
+      user_metadata: { full_name, usn: normalizedUsn, username: req.body.username || normalizedUsn },
+      app_metadata: { role: "student", hostel: targetHostel },
+    });
+    if (authError) throw authError;
+    createdUserId = authResult.user.id;
+
+    const { data: student, error: studentError } = await admin
+      .from("students")
+      .insert({
+        auth_id: createdUserId,
+        full_name: String(full_name).trim(),
+        usn: normalizedUsn,
+        email: normalizedEmail,
+        hostel: targetHostel,
+        phone: phone || null,
+        department: department || null,
+        year: year == null || year === "" ? null : String(year),
+        semester: semester || null,
+        guardian_name: guardian_name || null,
+        guardian_phone: guardian_phone || null,
+        address: address || null,
+        status: "active",
+      })
+      .select()
+      .single();
+
+    if (studentError) throw studentError;
+
+    res.status(201).json({
+      account: {
+        id: createdUserId,
+        email: normalizedEmail,
+        full_name,
+        username: normalizedUsn,
+        role: "student",
+        hostel: targetHostel,
+        status: "active",
+      },
+      student,
+    });
   } catch (err) {
+    // Roll back Auth creation if the student record could not be linked.
+    if (createdUserId) {
+      const { error: rollbackError } = await req.supabaseAdmin.auth.admin.deleteUser(createdUserId);
+      if (rollbackError) console.error("[ACCOUNT_ROLLBACK_FAILED]", rollbackError);
+    }
     next(err);
   }
 });
@@ -123,6 +218,73 @@ router.post("/admins", requireSuperAdmin, async (req, res, next) => {
   }
 });
 
+/**
+ * DELETE /api/accounts/:id — permanently delete an account.
+ * Super-admin only. For students, also removes the linked student row and
+ * dependent records configured with ON DELETE CASCADE.
+ */
+router.delete("/:id", requireSuperAdmin, async (req, res, next) => {
+  try {
+    const accountId = req.params.id;
+
+    if (accountId === req.userId) {
+      return res.status(400).json({
+        error: { message: "You cannot permanently delete your own account." },
+      });
+    }
+
+    const admin = req.supabaseAdmin;
+    const { data: targetResult, error: targetError } =
+      await admin.auth.admin.getUserById(accountId);
+    if (targetError) throw targetError;
+
+    const target = targetResult.user;
+    const targetRole = target.app_metadata?.role || target.user_metadata?.role;
+    // Super admins may delete other admin accounts, but never their own account.
+    // The authenticated caller is protected by the self-deletion check above.
+
+    // Capture the linked student row BEFORE deleting Auth. Its FK is ON DELETE SET NULL.
+    let linkedStudentId = null;
+    if (targetRole === "student") {
+      const { data: linkedStudent, error: studentLookupError } = await admin
+        .from("students")
+        .select("id")
+        .eq("auth_id", accountId)
+        .maybeSingle();
+      if (studentLookupError) throw studentLookupError;
+      linkedStudentId = linkedStudent?.id || null;
+    }
+
+    const { error: deleteAuthError } = await admin.auth.admin.deleteUser(accountId);
+    if (deleteAuthError) throw deleteAuthError;
+
+    // The students.auth_id FK becomes NULL on Auth deletion, so delete by the
+    // captured student primary key. Dependent rows with ON DELETE CASCADE follow.
+    if (linkedStudentId) {
+      const { error: studentDeleteError } = await admin
+        .from("students")
+        .delete()
+        .eq("id", linkedStudentId);
+      if (studentDeleteError) {
+        console.error("[ACCOUNT_DELETE_PARTIAL]", {
+          accountId,
+          studentId: linkedStudentId,
+          message: studentDeleteError.message,
+        });
+        return res.status(500).json({
+          error: {
+            message: "The login was deleted, but the linked student record could not be removed. Please contact the system administrator to finish cleanup.",
+          },
+        });
+      }
+    }
+
+    res.json({ success: true, deleted: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
 /** POST /api/accounts/:id/resend-invite — SUPER_ADMIN ONLY */
 router.post("/:id/resend-invite", requireSuperAdmin, async (req, res, next) => {
   try {
@@ -140,8 +302,8 @@ router.post("/:id/resend-invite", requireSuperAdmin, async (req, res, next) => {
   }
 });
 
-/** POST /api/accounts/:id/deactivate — SUPER_ADMIN ONLY */
-router.post("/:id/deactivate", requireSuperAdmin, async (req, res, next) => {
+/** POST /api/accounts/:id/deactivate — super admins, or scoped admins for students in their hostel */
+router.post("/:id/deactivate", async (req, res, next) => {
   try {
     // Prevent self-deactivation
     if (req.params.id === req.userId) {
@@ -150,9 +312,28 @@ router.post("/:id/deactivate", requireSuperAdmin, async (req, res, next) => {
       });
     }
 
+    const { data: targetResult, error: targetError } =
+      await req.supabaseAdmin.auth.admin.getUserById(req.params.id);
+    if (targetError) throw targetError;
+
+    if (req.role !== "super_admin") {
+      const target = targetResult.user;
+      const targetRole = target.app_metadata?.role || target.user_metadata?.role;
+      const targetHostel = target.app_metadata?.hostel;
+      if (
+        targetRole !== "student" ||
+        !req.hostelScope ||
+        targetHostel !== req.hostelScope
+      ) {
+        return res.status(403).json({
+          error: { message: "You can only deactivate student accounts belonging to your hostel." },
+        });
+      }
+    }
+
     const { error } = await req.supabaseAdmin.auth.admin.updateUserById(
       req.params.id,
-      { ban_duration: "876000h" } // ~100 years
+      { ban_duration: "876000h" } // ~100 years; reversible by removing the ban
     );
     if (error) throw error;
     res.json({ success: true });

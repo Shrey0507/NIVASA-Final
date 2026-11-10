@@ -102,6 +102,7 @@ export const createStudent = async (data) =>
       hostel: data.hostel ?? data.hostelType,
       guardian_details: data.guardianDetails,
       address: data.address,
+      ...(data.password ? { password: data.password } : {}),
     }),
   })));
 
@@ -129,6 +130,9 @@ export const createRoom = async (data) =>
       capacity: Number(data.capacity),
     }),
   })));
+
+export const getRoomAllocations = async (roomId) =>
+  (await apiRequest(`/allocations?room_id=${encodeURIComponent(roomId)}`)).data || [];
 
 export const allocateRoom = async (studentId, roomId) =>
   apiRequest("/allocations", {

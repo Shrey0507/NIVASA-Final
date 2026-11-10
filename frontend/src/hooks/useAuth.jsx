@@ -69,6 +69,7 @@ export function AuthProvider({ children }) {
       setAuth({
         isAuthenticated: true,
         loading: false,
+        userId: session.user?.id || null,
         role: displayRole,
         serverRole,
         hostel: me.hostel || null,
@@ -93,22 +94,44 @@ export function AuthProvider({ children }) {
   }, [loadSession]);
 
   /**
-   * Login: authenticate via Supabase directly, then loadSession handles
-   * fetching the trusted role from the backend.
+   * Login through the backend so student USNs can be resolved securely.
+   * The returned Supabase session is stored using the normal client SDK;
+   * the existing auth-state listener then loads the trusted role/profile.
    */
-  const login = useCallback(async (identifier, password) => {
-    const email = identifier.includes("@")
-      ? identifier.trim().toLowerCase()
-      : identifier.trim();
-
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
+  const login = useCallback(async (identifier, password, mode = "student") => {
+    const response = await apiRequest("/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ identifier: identifier.trim(), password, mode }),
     });
-    if (error) {
-      throw new Error(error.message || "Invalid credentials.");
+
+    if (!response?.session?.access_token || !response?.session?.refresh_token) {
+      throw new Error("The server did not return a valid login session.");
     }
-    // onAuthStateChange will fire and call loadSession automatically
+
+    // Defense in depth: reject a role mismatch before storing any session,
+    // including when the configured API is still running an older backend.
+    const isStudent = response.role === "student";
+    const isAdmin = ["super_admin", "boys_admin", "girls_admin"].includes(response.role);
+    if (mode === "student" && !isStudent) {
+      throw new Error(
+        isAdmin
+          ? "This is an administrator account. Please use the Admin login."
+          : "This account is not authorized for Student login."
+      );
+    }
+    if (mode === "admin" && !isAdmin) {
+      throw new Error(
+        isStudent
+          ? "This is a student account. Please use the Student login."
+          : "This account is not authorized for Admin login."
+      );
+    }
+
+    const { data, error } = await supabase.auth.setSession({
+      access_token: response.session.access_token,
+      refresh_token: response.session.refresh_token,
+    });
+    if (error) throw new Error(error.message || "Unable to establish login session.");
     return data;
   }, []);
 
