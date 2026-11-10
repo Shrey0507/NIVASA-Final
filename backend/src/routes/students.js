@@ -71,13 +71,46 @@ router.post("/", async (req, res, next) => {
       body.hostel = req.hostelScope;
     }
 
-    const { data, error } = await req.supabaseAdmin
-      .from("students")
-      .insert(body)
-      .select()
-      .single();
-    if (error) throw error;
-    res.status(201).json({ data });
+    const admin = req.supabaseAdmin;
+    const password = typeof body.password === "string" ? body.password : "";
+    delete body.password;
+
+    // Backward-compatible: without a password, keep creating a student
+    // record exactly as before. Supplying a password provisions a login too.
+    let authUser = null;
+    if (password) {
+      if (!body.email || !String(body.email).includes("@")) {
+        return res.status(400).json({ error: { message: "A valid student email is required to create login credentials." } });
+      }
+      if (password.length < 8) {
+        return res.status(400).json({ error: { message: "Student password must be at least 8 characters." } });
+      }
+
+      const { data: created, error: createAuthError } = await admin.auth.admin.createUser({
+        email: String(body.email).trim().toLowerCase(),
+        password,
+        email_confirm: true,
+        user_metadata: { full_name: body.full_name || body.fullName || "" },
+        app_metadata: { role: "student" },
+      });
+      if (createAuthError) throw createAuthError;
+      authUser = created.user;
+      body.auth_id = authUser.id;
+    }
+
+    try {
+      const { data, error } = await admin
+        .from("students")
+        .insert(body)
+        .select()
+        .single();
+      if (error) throw error;
+      res.status(201).json({ data, credentials_created: Boolean(authUser) });
+    } catch (insertError) {
+      // Avoid leaving an orphan Auth account if the student insert fails.
+      if (authUser?.id) await admin.auth.admin.deleteUser(authUser.id);
+      throw insertError;
+    }
   } catch (err) {
     next(err);
   }
