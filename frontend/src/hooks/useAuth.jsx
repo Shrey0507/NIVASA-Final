@@ -108,6 +108,25 @@ export function AuthProvider({ children }) {
       throw new Error("The server did not return a valid login session.");
     }
 
+    // Defense in depth: reject a role mismatch before storing any session,
+    // including when the configured API is still running an older backend.
+    const isStudent = response.role === "student";
+    const isAdmin = ["super_admin", "boys_admin", "girls_admin"].includes(response.role);
+    if (mode === "student" && !isStudent) {
+      throw new Error(
+        isAdmin
+          ? "This is an administrator account. Please use the Admin login."
+          : "This account is not authorized for Student login."
+      );
+    }
+    if (mode === "admin" && !isAdmin) {
+      throw new Error(
+        isStudent
+          ? "This is a student account. Please use the Student login."
+          : "This account is not authorized for Admin login."
+      );
+    }
+
     const { data, error } = await supabase.auth.setSession({
       access_token: response.session.access_token,
       refresh_token: response.session.refresh_token,
