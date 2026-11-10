@@ -98,10 +98,10 @@ export function AuthProvider({ children }) {
    * The returned Supabase session is stored using the normal client SDK;
    * the existing auth-state listener then loads the trusted role/profile.
    */
-  const login = useCallback(async (identifier, password) => {
+  const login = useCallback(async (identifier, password, mode = "student") => {
     const response = await apiRequest("/auth/login", {
       method: "POST",
-      body: JSON.stringify({ identifier: identifier.trim(), password }),
+      body: JSON.stringify({ identifier: identifier.trim(), password, mode }),
     });
 
     if (!response?.session?.access_token || !response?.session?.refresh_token) {
