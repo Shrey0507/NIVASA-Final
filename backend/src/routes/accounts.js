@@ -47,16 +47,22 @@ router.get("/", async (req, res, next) => {
  * Hostel-scoped admins can only create students for their own hostel.
  */
 router.post("/students", async (req, res, next) => {
+  let createdUserId = null;
   try {
-    const { email, password, full_name, usn, hostel } = req.body;
-    if (!email || !full_name) {
+    const { email, password, full_name, usn, hostel, phone, department, year } = req.body;
+    if (!email || !full_name || !usn || !password) {
       return res.status(400).json({
-        error: { message: "Email and full_name are required." },
+        error: { message: "Full name, email, student ID / USN, and password are required." },
       });
     }
+    if (String(password).length < 8) {
+      return res.status(400).json({ error: { message: "Password must be at least 8 characters." } });
+    }
 
-    // Enforce hostel scope: non-super admins can only create for their hostel
     const targetHostel = hostel || "boys";
+    if (!["boys", "girls"].includes(targetHostel)) {
+      return res.status(400).json({ error: { message: "Choose a valid hostel." } });
+    }
     if (req.hostelScope && req.hostelScope !== targetHostel) {
       return res.status(403).json({
         error: { message: `You can only create students for the ${req.hostelScope} hostel.` },
@@ -64,19 +70,62 @@ router.post("/students", async (req, res, next) => {
     }
 
     const admin = req.supabaseAdmin;
+    const normalizedEmail = String(email).trim().toLowerCase();
+    const normalizedUsn = String(usn).trim().toUpperCase();
 
-    const { data: authUser, error: authErr } =
-      await admin.auth.admin.createUser({
-        email: email.trim().toLowerCase(),
-        password: password || undefined,
-        email_confirm: true,
-        user_metadata: { full_name, usn },
-        app_metadata: { role: "student", hostel: targetHostel },
-      });
-    if (authErr) throw authErr;
+    const { data: existingStudent, error: lookupError } = await admin
+      .from("students").select("id").ilike("usn", normalizedUsn).maybeSingle();
+    if (lookupError) throw lookupError;
+    if (existingStudent) {
+      return res.status(409).json({ error: { message: "A student with this ID / USN already exists." } });
+    }
 
-    res.status(201).json({ account: authUser.user });
+    const { data: authResult, error: authError } = await admin.auth.admin.createUser({
+      email: normalizedEmail,
+      password,
+      email_confirm: true,
+      user_metadata: { full_name, usn: normalizedUsn, username: req.body.username || normalizedUsn },
+      app_metadata: { role: "student", hostel: targetHostel },
+    });
+    if (authError) throw authError;
+    createdUserId = authResult.user.id;
+
+    const { data: student, error: studentError } = await admin
+      .from("students")
+      .insert({
+        auth_id: createdUserId,
+        full_name: String(full_name).trim(),
+        usn: normalizedUsn,
+        email: normalizedEmail,
+        hostel: targetHostel,
+        phone: phone || null,
+        department: department || null,
+        year: year == null ? null : String(year),
+        status: "active",
+      })
+      .select()
+      .single();
+
+    if (studentError) throw studentError;
+
+    res.status(201).json({
+      account: {
+        id: createdUserId,
+        email: normalizedEmail,
+        full_name,
+        username: normalizedUsn,
+        role: "student",
+        hostel: targetHostel,
+        status: "active",
+      },
+      student,
+    });
   } catch (err) {
+    // Roll back Auth creation if the student record could not be linked.
+    if (createdUserId) {
+      const { error: rollbackError } = await req.supabaseAdmin.auth.admin.deleteUser(createdUserId);
+      if (rollbackError) console.error("[ACCOUNT_ROLLBACK_FAILED]", rollbackError);
+    }
     next(err);
   }
 });
