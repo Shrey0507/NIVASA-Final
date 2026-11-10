@@ -74,10 +74,10 @@ export const publicRouter = Router();
  */
 publicRouter.post("/login", async (req, res, next) => {
   try {
-    const { identifier, password } = req.body;
-    if (!identifier || !password) {
+    const { identifier, password, mode } = req.body;
+    if (!identifier || !password || !["admin", "student"].includes(mode)) {
       return res.status(400).json({
-        error: { message: "Email/username and password are required." },
+        error: { message: "Email/username, password, and a valid login type are required." },
       });
     }
 
@@ -128,6 +128,20 @@ publicRouter.post("/login", async (req, res, next) => {
       app_metadata: user.app_metadata,
       user_metadata: user.user_metadata,
     });
+
+    // Enforce the selected login portal on the server. A valid password alone
+    // must never allow an admin account into the student portal (or vice versa).
+    const isStudentAccount = role === "student";
+    const isAdminAccount = ["super_admin", "boys_admin", "girls_admin"].includes(role);
+    if ((mode === "student" && !isStudentAccount) || (mode === "admin" && !isAdminAccount)) {
+      return res.status(403).json({
+        error: {
+          message: mode === "student"
+            ? "This is an administrator account. Please use the Admin login."
+            : "This is a student account. Please use the Student login.",
+        },
+      });
+    }
 
     // Resolve linked student record, including safe backfill for older accounts.
     const studentRecord = role === "student"
