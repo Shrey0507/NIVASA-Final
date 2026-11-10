@@ -102,6 +102,7 @@ export const createStudent = async (data) =>
       hostel: data.hostel ?? data.hostelType,
       guardian_details: data.guardianDetails,
       address: data.address,
+      ...(data.password ? { password: data.password } : {}),
     }),
   })));
 
