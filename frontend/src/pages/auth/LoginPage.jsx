@@ -28,6 +28,21 @@ export default function LoginPage({ initialMode }) {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const [lockUntil, setLockUntil] = useState(0);
+  const [secondsRemaining, setSecondsRemaining] = useState(0);
+
+  // Keep the cooldown countdown accurate and automatically unlock at zero.
+  useEffect(() => {
+    if (!lockUntil) return;
+    const updateCountdown = () => {
+      const remaining = Math.max(0, Math.ceil((lockUntil - Date.now()) / 1000));
+      setSecondsRemaining(remaining);
+      if (remaining === 0) setLockUntil(0);
+    };
+    updateCountdown();
+    const timer = window.setInterval(updateCountdown, 250);
+    return () => window.clearInterval(timer);
+  }, [lockUntil]);
 
   // Sync mode whenever URL or initialMode changes
   useEffect(() => {
@@ -192,7 +207,7 @@ export default function LoginPage({ initialMode }) {
             </button>
           </div>
         </div>
-        {error && <p className="text-sm text-rose-300">{error}</p>}
+        {error && <p role="alert" className="text-sm text-rose-300">{error}</p>}\n        {secondsRemaining > 0 && (\n          <div role="status" aria-live="polite" className="rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-3 text-center">\n            <p className="text-sm font-medium text-amber-200">Please wait before trying again</p>\n            <p className="mt-1 text-2xl font-semibold tabular-nums text-white">00:{String(secondsRemaining).padStart(2, "0")}</p>\n            <p className="mt-1 text-xs text-white/60">Login will unlock automatically when the timer ends.</p>\n          </div>\n        )}
         {message && <p className="text-sm text-emerald-300">{message}</p>}
         <Button type="submit" className="w-full" disabled={loading}>
           {loading ? "Signing in\u2026" : "Sign in"}
