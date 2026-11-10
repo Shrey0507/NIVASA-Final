@@ -14,8 +14,7 @@ const PAGE_SIZE = 25;
 const EMPTY_FORM = { full_name: "", email: "", username: "", usn: "", password: "", hostel: "boys", phone: "", department: "", year: 1 };
 
 export default function CredentialsPage() {
-  const { role, user, profile } = useAuth();
-  const currentEmail = profile?.email || (typeof user === "string" ? null : user?.email);
+  const { role, userId } = useAuth();
   const [accounts, setAccounts] = useState([]);
   const [form, setForm] = useState(EMPTY_FORM);
   const [mode, setMode] = useState("student");
@@ -185,7 +184,7 @@ export default function CredentialsPage() {
                 <div className="flex justify-center"><Badge variant="outline" className="text-[11px]">{account.role}</Badge></div>
                 <div className="flex justify-center"><Badge variant={account.status === "active" ? "secondary" : "destructive"} className="text-[11px]">{account.status}</Badge></div>
                 <div className="flex items-center justify-end">
-                  {role === "super" && account.email !== currentEmail && <Button size="sm" variant="ghost" className="h-8 px-2 text-xs text-destructive hover:text-destructive" disabled={busyId === account.id} onClick={() => permanentlyRemoveAccount(account)} title="Permanently delete account"><Trash2 className="h-3.5 w-3.5" />{busyId === account.id ? "Deleting…" : "Delete"}</Button>}
+                  {role === "super" && account.id !== userId && <Button size="sm" variant="ghost" className="h-8 px-2 text-xs text-destructive hover:text-destructive" disabled={busyId === account.id} onClick={() => permanentlyRemoveAccount(account)} title="Permanently delete account"><Trash2 className="h-3.5 w-3.5" />{busyId === account.id ? "Deleting…" : "Delete"}</Button>}
                 </div>
               </div>)}
             </div>
