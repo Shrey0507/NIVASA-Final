@@ -20,7 +20,7 @@ const SUPER_ADMIN_EMAIL = "shreyankvy@gmail.com";
  * an unclaimed row whose email (and USN when present) uniquely matches.
  */
 async function getLinkedStudentRecord(admin, user) {
-  const columns = "*, rooms(room_number)";
+  const columns = "*, rooms(room_number, block)";
   const { data: linked, error: linkedError } = await admin
     .from("students")
     .select(columns)
