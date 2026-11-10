@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { Search, RefreshCw, UserX, ChevronLeft, ChevronRight, KeyRound, UserPlus } from "lucide-react";
-import { getAccounts, createStudentAccount, createAdminAccount, deactivateAccount } from "@/services/accountService";
+import { Search, RefreshCw, UserX, Trash2, ChevronLeft, ChevronRight, UserPlus } from "lucide-react";
+import { getAccounts, createStudentAccount, createAdminAccount, deactivateAccount, permanentlyDeleteAccount } from "@/services/accountService";
 import { useAuth } from "@/hooks/useAuth";
 import { PageHeader } from "@/components/common/PageHeader";
 import { SectionCard } from "@/components/common/SectionCard";
@@ -72,6 +72,26 @@ export default function CredentialsPage() {
       setError(e.message || "Could not create account.");
     } finally {
       setCreating(false);
+    }
+  };
+
+  const permanentlyRemoveAccount = async (account) => {
+    const confirmation = window.prompt(
+      `PERMANENTLY DELETE ${account.full_name || account.email}? This cannot be undone. This removes the login and, for student accounts, the linked student record and dependent records. Type DELETE to confirm.`
+    );
+    if (confirmation !== "DELETE") return;
+
+    setBusyId(account.id);
+    setError("");
+    setMessage("");
+    try {
+      await permanentlyDeleteAccount(account.id);
+      setMessage(`${account.full_name || account.email} was permanently deleted.`);
+      await load();
+    } catch (e) {
+      setError(e.message || "Could not permanently delete account.");
+    } finally {
+      setBusyId("");
     }
   };
 
@@ -171,6 +191,7 @@ export default function CredentialsPage() {
               <div className="flex flex-wrap items-center gap-2">
                 <Badge variant="outline">{account.role}</Badge><Badge variant={account.status === "active" ? "secondary" : "destructive"}>{account.status}</Badge>
                 {account.status === "active" && <Button size="sm" variant="outline" disabled={busyId === account.id || (account.role === "super_admin" && role !== "super")} onClick={() => removeAccount(account)}><UserX />{busyId === account.id ? "Removing…" : "Deactivate"}</Button>}
+                {role === "super" && account.role !== "super_admin" && <Button size="sm" variant="destructive" disabled={busyId === account.id} onClick={() => permanentlyRemoveAccount(account)} title="Permanently delete account"><Trash2 />{busyId === account.id ? "Deleting…" : "Delete permanently"}</Button>}
               </div>
             </div>)}
           </div>
