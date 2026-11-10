@@ -231,8 +231,8 @@ router.post("/:id/resend-invite", requireSuperAdmin, async (req, res, next) => {
   }
 });
 
-/** POST /api/accounts/:id/deactivate — SUPER_ADMIN ONLY */
-router.post("/:id/deactivate", requireSuperAdmin, async (req, res, next) => {
+/** POST /api/accounts/:id/deactivate — super admins, or scoped admins for students in their hostel */
+router.post("/:id/deactivate", async (req, res, next) => {
   try {
     // Prevent self-deactivation
     if (req.params.id === req.userId) {
@@ -241,9 +241,28 @@ router.post("/:id/deactivate", requireSuperAdmin, async (req, res, next) => {
       });
     }
 
+    const { data: targetResult, error: targetError } =
+      await req.supabaseAdmin.auth.admin.getUserById(req.params.id);
+    if (targetError) throw targetError;
+
+    if (req.role !== "super_admin") {
+      const target = targetResult.user;
+      const targetRole = target.app_metadata?.role || target.user_metadata?.role;
+      const targetHostel = target.app_metadata?.hostel;
+      if (
+        targetRole !== "student" ||
+        !req.hostelScope ||
+        targetHostel !== req.hostelScope
+      ) {
+        return res.status(403).json({
+          error: { message: "You can only deactivate student accounts belonging to your hostel." },
+        });
+      }
+    }
+
     const { error } = await req.supabaseAdmin.auth.admin.updateUserById(
       req.params.id,
-      { ban_duration: "876000h" } // ~100 years
+      { ban_duration: "876000h" } // ~100 years; reversible by removing the ban
     );
     if (error) throw error;
     res.json({ success: true });
