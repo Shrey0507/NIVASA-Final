@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { Search, RefreshCw, UserX, Trash2, ChevronLeft, ChevronRight, UserPlus } from "lucide-react";
-import { getAccounts, createStudentAccount, createAdminAccount, deactivateAccount, permanentlyDeleteAccount } from "@/services/accountService";
+import { Search, RefreshCw, Trash2, ChevronLeft, ChevronRight, UserPlus } from "lucide-react";
+import { getAccounts, createStudentAccount, createAdminAccount, permanentlyDeleteAccount } from "@/services/accountService";
 import { useAuth } from "@/hooks/useAuth";
 import { PageHeader } from "@/components/common/PageHeader";
 import { SectionCard } from "@/components/common/SectionCard";
@@ -108,24 +108,7 @@ export default function CredentialsPage() {
     setPage(1);
   };
 
-  const removeAccount = async (account) => {
-    const confirmed = window.confirm(
-      `Deactivate ${account.full_name || account.email}? They will no longer be able to sign in. This can be reversed by an administrator later.`
-    );
-    if (!confirmed) return;
-    setBusyId(account.id);
-    setError("");
-    setMessage("");
-    try {
-      await deactivateAccount(account.id);
-      setMessage(`${account.full_name || account.email} has been deactivated.`);
-      await load();
-    } catch (e) {
-      setError(e.message || "Could not deactivate account.");
-    } finally {
-      setBusyId("");
-    }
-  };
+
 
   return <>
     <PageHeader title="Credentials" description="Create accounts and manage access for students and hostel administrators." />
@@ -188,7 +171,7 @@ export default function CredentialsPage() {
         {loading ? <p className="py-10 text-center text-sm text-muted-foreground">Loading accounts…</p> :
           accounts.length === 0 ? <EmptyState title="No accounts found" description="Try another search term or clear the filters." /> :
           <div className="overflow-hidden rounded-lg border">
-            <div className="hidden grid-cols-[minmax(0,2fr)_minmax(120px,0.8fr)_minmax(120px,0.8fr)_minmax(180px,1fr)] items-center gap-3 border-b bg-muted/30 px-3 py-2 text-xs font-medium text-muted-foreground sm:grid">
+            <div className="hidden grid-cols-[minmax(0,2fr)_minmax(120px,0.8fr)_minmax(120px,0.8fr)_minmax(110px,0.6fr)] items-center gap-3 border-b bg-muted/30 px-3 py-2 text-xs font-medium text-muted-foreground sm:grid">
               <span>Account</span><span className="text-center">Role</span><span className="text-center">Status</span><span className="text-right">Actions</span>
             </div>
             <div className="divide-y">
@@ -200,8 +183,7 @@ export default function CredentialsPage() {
                 </div>
                 <div className="flex justify-center"><Badge variant="outline" className="text-[11px]">{account.role}</Badge></div>
                 <div className="flex justify-center"><Badge variant={account.status === "active" ? "secondary" : "destructive"} className="text-[11px]">{account.status}</Badge></div>
-                <div className="flex flex-wrap items-center justify-start gap-1 sm:justify-end">
-                  {account.status === "active" && <Button size="sm" variant="ghost" className="h-8 px-2 text-xs" disabled={busyId === account.id || (account.role === "super_admin" && role !== "super")} onClick={() => removeAccount(account)} title="Deactivate account"><UserX className="h-3.5 w-3.5" />Deactivate</Button>}
+                <div className="flex items-center justify-end">
                   {role === "super" && account.role !== "super_admin" && <Button size="sm" variant="ghost" className="h-8 px-2 text-xs text-destructive hover:text-destructive" disabled={busyId === account.id} onClick={() => permanentlyRemoveAccount(account)} title="Permanently delete account"><Trash2 className="h-3.5 w-3.5" />{busyId === account.id ? "Deleting…" : "Delete"}</Button>}
                 </div>
               </div>)}
