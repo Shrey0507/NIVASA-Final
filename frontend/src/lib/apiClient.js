@@ -20,6 +20,14 @@ export async function apiRequest(path, options = {}) {
 
   // Handle authentication failure — sign out and redirect
   if (response.status === 401) {
+    // Login is a public request: a failed credential attempt must not trigger
+    // a global sign-out or discard rate-limit metadata.
+    if (path === "/auth/login") {
+      const loginError = new Error(payload?.error?.message || "Invalid login credentials.");
+      loginError.status = response.status;
+      loginError.retryAfter = Number(payload?.retryAfter || response.headers.get("Retry-After") || 0);
+      throw loginError;
+    }
     await supabase.auth.signOut();
     throw new Error(payload?.error?.message || "Session expired. Please sign in again.");
   }
