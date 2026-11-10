@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Plus, Search, UserPlus } from "lucide-react";
+import { Search, UserPlus } from "lucide-react";
 
 import { deleteStudent, getStudents } from "@/services/adminService";
 import { useDebounce } from "@/hooks/useDebounce";
@@ -75,11 +75,6 @@ export default function StudentsPage() {
     load();
   }, [load]);
 
-  const openAdd = () => {
-    setSelected(null);
-    setShowForm(true);
-  };
-
   const openEdit = (student) => {
     setSelected(student);
     setShowForm(true);
@@ -115,11 +110,7 @@ export default function StudentsPage() {
             ? "Loading residents..."
             : `${students.length} resident${students.length === 1 ? "" : "s"} found`
         }
-      >
-        <Button onClick={openAdd}>
-          <Plus /> Add student
-        </Button>
-      </PageHeader>
+      />
 
       {/* Filters */}
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
@@ -181,12 +172,7 @@ export default function StudentsPage() {
             <EmptyState
               icon={UserPlus}
               title="No students found"
-              description="Try adjusting your filters, or add a new resident."
-              action={
-                <Button onClick={openAdd}>
-                  <Plus /> Add student
-                </Button>
-              }
+              description="Try adjusting your filters. New student accounts are created from the Credentials module."
             />
           </div>
         ) : (
