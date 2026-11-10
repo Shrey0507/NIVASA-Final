@@ -9,6 +9,9 @@ import {
   UserPlus,
   UserRoundX,
   RefreshCw,
+  DoorOpen,
+  SlidersHorizontal,
+  Sparkles,
 } from "lucide-react";
 
 import { getRooms, createRoom, getStudents, getRoomAllocations, allocateRoom, deallocateRoom } from "@/services/adminService";
@@ -302,142 +305,122 @@ export default function RoomsPage() {
         description="Manage hostel rooms, occupancy and bed availability."
       />
 
-      {/* Hostel tabs */}
-      <div className="flex flex-col gap-4 rounded-2xl border border-border/70 bg-card/70 p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-        <Tabs
-          value={hostel}
-          onValueChange={(value) => {
-            setHostel(value);
-            setFloor(ALL);
-            setBlock(ALL);
-            setAvailability(ALL);
-          }}
-        >
-          <TabsList>
-            <TabsTrigger value="boys">Boys Hostel</TabsTrigger>
-            <TabsTrigger value="girls">Girls Hostel</TabsTrigger>
-          </TabsList>
-        </Tabs>
-
-        <Button onClick={openAddDialog}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Room
-        </Button>
-      </div>
-
-      {/* Summary cards */}
-      <div className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-4">
-        <div className="group rounded-2xl border border-border/70 bg-card p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">Total Rooms</p>
-            <Building2 className="h-5 w-5 text-muted-foreground" />
+      {/* Hostel overview and primary action */}
+      <section className="relative overflow-hidden rounded-3xl border border-border/70 bg-gradient-to-br from-card via-card to-primary/10 p-5 shadow-sm sm:p-7">
+        <div className="pointer-events-none absolute -right-12 -top-16 h-56 w-56 rounded-full bg-primary/10 blur-3xl" />
+        <div className="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              <Sparkles className="h-4 w-4 text-primary" /> Hostel overview
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">
+                {hostel === "boys" ? "Boys' Hostel" : "Girls' Hostel"}
+              </h2>
+              <p className="mt-1 max-w-xl text-sm text-muted-foreground">
+                A clear view of rooms, beds and student occupancy across your selected hostel.
+              </p>
+            </div>
+            <Tabs
+              value={hostel}
+              onValueChange={(value) => {
+                setHostel(value);
+                setFloor(ALL);
+                setBlock(ALL);
+                setAvailability(ALL);
+              }}
+            >
+              <TabsList className="h-11 rounded-xl bg-background/80 p-1">
+                <TabsTrigger className="rounded-lg px-5" value="boys">Boys Hostel</TabsTrigger>
+                <TabsTrigger className="rounded-lg px-5" value="girls">Girls Hostel</TabsTrigger>
+              </TabsList>
+            </Tabs>
           </div>
-          <p className="mt-2 text-2xl font-bold">{summary.total}</p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Rooms in selected hostel
-          </p>
-        </div>
-
-        <div className="rounded-xl border bg-card p-5">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">Total Beds</p>
-            <BedDouble className="h-5 w-5 text-muted-foreground" />
+          <div className="flex flex-col gap-3 sm:flex-row lg:flex-col lg:items-end">
+            <div className="rounded-2xl border border-border/70 bg-background/70 px-4 py-3 text-sm backdrop-blur">
+              <p className="text-xs text-muted-foreground">Current occupancy</p>
+              <p className="mt-1 text-2xl font-bold tabular-nums">{summary.pct}%</p>
+              <p className="text-xs text-muted-foreground">{summary.occupied} occupied of {summary.beds} beds</p>
+            </div>
+            <Button onClick={openAddDialog} size="lg" className="h-11 rounded-xl px-5 shadow-sm">
+              <Plus className="mr-2 h-4 w-4" /> Add a room
+            </Button>
           </div>
-          <p className="mt-2 text-2xl font-bold">{summary.beds}</p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Total bed capacity
-          </p>
         </div>
+      </section>
 
-        <div className="rounded-xl border bg-card p-5">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">Occupied Beds</p>
-            <Users className="h-5 w-5 text-muted-foreground" />
-          </div>
-          <p className="mt-2 text-2xl font-bold">{summary.occupied}</p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {summary.pct}% occupancy
-          </p>
-        </div>
+      {/* Key metrics */}
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {[
+          { label: "Total rooms", value: summary.total, note: "Registered rooms", icon: Building2, tone: "text-sky-500 bg-sky-500/10" },
+          { label: "Bed capacity", value: summary.beds, note: "Total available beds", icon: BedDouble, tone: "text-violet-500 bg-violet-500/10" },
+          { label: "Occupied beds", value: summary.occupied, note: "Currently assigned", icon: Users, tone: "text-amber-500 bg-amber-500/10" },
+          { label: "Rooms with vacancy", value: summary.available, note: "At least one free bed", icon: CheckCircle2, tone: "text-emerald-500 bg-emerald-500/10" },
+        ].map((metric) => {
+          const MetricIcon = metric.icon;
+          return (
+            <div key={metric.label} className="rounded-2xl border border-border/70 bg-card p-4 shadow-sm transition-all hover:border-primary/30 hover:shadow-md sm:p-5">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">{metric.label}</p>
+                  <p className="mt-2 text-3xl font-bold tracking-tight tabular-nums">{metric.value}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{metric.note}</p>
+                </div>
+                <span className={cn("rounded-xl p-3", metric.tone)}><MetricIcon className="h-5 w-5" /></span>
+              </div>
+            </div>
+          );
+        })}
+      </section>
 
-        <div className="rounded-xl border bg-card p-5">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">Available Rooms</p>
-            <CheckCircle2 className="h-5 w-5 text-green-600" />
-          </div>
-          <p className="mt-2 text-2xl font-bold">{summary.available}</p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Rooms with vacant beds
-          </p>
-        </div>
-      </div>
-
-      {/* Occupancy */}
-      <div className="rounded-2xl border border-border/70 bg-card p-5 shadow-sm">
-        <div className="mb-4 flex items-center justify-between">
+      {/* Occupancy at a glance */}
+      <section className="rounded-2xl border border-border/70 bg-card p-5 shadow-sm sm:p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h3 className="font-semibold">Overall Occupancy</h3>
-            <p className="text-sm text-muted-foreground">
-              {summary.occupied} of {summary.beds} beds occupied
+            <div className="flex items-center gap-2">
+              <DoorOpen className="h-4 w-4 text-primary" />
+              <h3 className="font-semibold">Bed occupancy</h3>
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {summary.occupied} occupied · {Math.max(summary.beds - summary.occupied, 0)} vacant across {summary.total} rooms
             </p>
           </div>
-          <span className="text-lg font-semibold">{summary.pct}%</span>
+          <p className="text-3xl font-bold tracking-tight tabular-nums">{summary.pct}<span className="text-base text-muted-foreground">%</span></p>
         </div>
-        <Progress value={summary.pct} />
-      </div>
-
-      {/* Filters */}
-      <div className="flex flex-col gap-3 rounded-2xl border border-border/70 bg-card/80 p-4 shadow-sm md:flex-row md:flex-wrap">
-        <div className="relative min-w-[200px] flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search room number..."
-            className="pl-9"
-          />
+        <div className="mt-4 h-3 overflow-hidden rounded-full bg-muted">
+          <div className="h-full rounded-full bg-gradient-to-r from-primary/70 to-primary transition-all duration-500" style={{ width: `${summary.pct}%` }} />
         </div>
+        <div className="mt-2 flex justify-between text-xs text-muted-foreground">
+          <span>0 beds occupied</span><span>{summary.beds} total beds</span>
+        </div>
+      </section>
 
-        <Select value={floor} onValueChange={setFloor}>
-          <SelectTrigger className="w-full md:w-[150px]">
-            <SelectValue placeholder="All floors" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL}>All floors</SelectItem>
-            {floors.map((value) => (
-              <SelectItem key={value} value={value}>
-                Floor {value}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <Select value={block} onValueChange={setBlock}>
-          <SelectTrigger className="w-full md:w-[150px]">
-            <SelectValue placeholder="All blocks" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL}>All blocks</SelectItem>
-            {blocks.map((value) => (
-              <SelectItem key={value} value={value}>
-                Block {value}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <Select value={availability} onValueChange={setAvailability}>
-          <SelectTrigger className="w-full md:w-[180px]">
-            <SelectValue placeholder="All availability" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL}>All availability</SelectItem>
-            <SelectItem value="available">Available</SelectItem>
-            <SelectItem value="occupied">Occupied</SelectItem>
-            <SelectItem value="full">Full</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      {/* Search and filters */}
+      <section className="rounded-2xl border border-border/70 bg-card p-4 shadow-sm sm:p-5">
+        <div className="mb-3 flex items-center gap-2">
+          <SlidersHorizontal className="h-4 w-4 text-primary" />
+          <h3 className="text-sm font-semibold">Find a room</h3>
+          <span className="ml-auto text-xs text-muted-foreground">{rooms.length} shown</span>
+        </div>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(240px,1fr)_160px_160px_190px]">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search by room number..." className="h-11 rounded-xl pl-9" />
+          </div>
+          <Select value={floor} onValueChange={setFloor}>
+            <SelectTrigger className="h-11 rounded-xl"><SelectValue placeholder="All floors" /></SelectTrigger>
+            <SelectContent><SelectItem value={ALL}>All floors</SelectItem>{floors.map((value) => <SelectItem key={value} value={value}>Floor {value}</SelectItem>)}</SelectContent>
+          </Select>
+          <Select value={block} onValueChange={setBlock}>
+            <SelectTrigger className="h-11 rounded-xl"><SelectValue placeholder="All blocks" /></SelectTrigger>
+            <SelectContent><SelectItem value={ALL}>All blocks</SelectItem>{blocks.map((value) => <SelectItem key={value} value={value}>Block {value}</SelectItem>)}</SelectContent>
+          </Select>
+          <Select value={availability} onValueChange={setAvailability}>
+            <SelectTrigger className="h-11 rounded-xl"><SelectValue placeholder="Any availability" /></SelectTrigger>
+            <SelectContent><SelectItem value={ALL}>Any availability</SelectItem><SelectItem value="available">Has vacant beds</SelectItem><SelectItem value="occupied">Partially occupied</SelectItem><SelectItem value="full">Full</SelectItem></SelectContent>
+          </Select>
+        </div>
+      </section>
 
       {/* Error */}
       {error && (
@@ -467,11 +450,11 @@ export default function RoomsPage() {
           ))}
         </div>
       ) : !error && rooms.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-border/80 bg-card/50 p-12 text-center shadow-sm">
+        <div className="rounded-3xl border border-dashed border-border/80 bg-card/50 px-6 py-16 text-center shadow-sm">
           <BedDouble className="mx-auto h-10 w-10 text-muted-foreground" />
-          <h3 className="mt-3 font-semibold">No rooms found</h3>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Add a room or change your filters to see rooms here.
+          <h3 className="mt-4 text-lg font-semibold">No rooms found</h3>
+          <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-muted-foreground">
+            There are no rooms matching this view. Add a room or adjust your filters to see more results.
           </p>
           <Button className="mt-4" onClick={openAddDialog}>
             <Plus className="mr-2 h-4 w-4" />
@@ -479,7 +462,7 @@ export default function RoomsPage() {
           </Button>
         </div>
       ) : !error ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
           {rooms.map((room) => {
             const occupied = Number(room.occupied || 0);
             const capacity = Number(room.capacity || 0);
@@ -492,14 +475,14 @@ export default function RoomsPage() {
             return (
               <div
                 key={room.id || room.room_number || room.number}
-                className="group relative overflow-hidden rounded-2xl border border-border/70 bg-card p-5 shadow-sm transition-all duration-200 hover:-translate-y-1 hover:border-primary/30 hover:shadow-lg"
+                className="group relative overflow-hidden rounded-2xl border border-border/70 bg-card p-5 shadow-sm transition-all duration-200 hover:-translate-y-1 hover:border-primary/40 hover:shadow-xl"
               >
-                <div className="flex items-start justify-between gap-3">
+                <div className="mb-4 flex items-start justify-between gap-3">
                   <div>
                     <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                       Room number
                     </p>
-                    <h3 className="mt-1 text-2xl font-bold tracking-tight">
+                    <h3 className="mt-1 text-3xl font-bold tracking-tight">
                       {room.number || room.room_number}
                     </h3>
                   </div>
@@ -517,7 +500,7 @@ export default function RoomsPage() {
                   </span>
                 </div>
 
-                <div className="mt-6 rounded-xl bg-muted/40 p-3">
+                <div className="mt-5 rounded-xl border border-border/60 bg-muted/30 p-3.5">
                   <div className="mb-2 flex justify-between text-sm">
                     <span className="text-muted-foreground">
                       Bed occupancy
@@ -534,8 +517,8 @@ export default function RoomsPage() {
                 </div>
 
                 <Button
-                  variant="outline"
-                  className="mt-4 w-full rounded-xl"
+                  variant="default"
+                  className="mt-4 h-10 w-full rounded-xl"
                   onClick={() => setSelectedRoom(room)}
                 >
                   View Room Details
