@@ -67,7 +67,7 @@ export default function LoginPage({ initialMode }) {
       return setError("Email/username and password are required.");
     setLoading(true);
     try {
-      await login(form.identifier, form.password);
+      await login(form.identifier, form.password, mode);
       // After login, onAuthStateChange fires → loadSession → role is set
       // The useEffect above handles redirect based on role
     } catch (err) {
@@ -146,13 +146,13 @@ export default function LoginPage({ initialMode }) {
       <p className="mt-2 text-sm text-white/70">
         {isAdmin
           ? "Sign in with your administrator credentials."
-          : "Sign in with your student email or username."}
+          : "Sign in with your student USN or registered email."}
       </p>
 
       <form onSubmit={submit} className="mt-6 space-y-4">
         <div className="space-y-2">
           <Label htmlFor="identifier" className="text-white/85">
-            Email or username
+            {isAdmin ? "Admin email" : "Student USN or email"}
           </Label>
           <div className="relative">
             <Mail className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-white/40" />
