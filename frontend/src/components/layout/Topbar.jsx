@@ -1,4 +1,4 @@
-import { Bell, Menu, Search } from "lucide-react";
+import { Bell, Menu } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { getMyNotices } from "@/services/studentService";
@@ -73,9 +73,6 @@ export function Topbar({
 
       <div className="flex items-center gap-1">
         {actions}
-        <Button variant="ghost" size="icon" aria-label="Search" className="hidden sm:inline-flex">
-          <Search />
-        </Button>
         {showNotifications && (
           <Popover open={notificationsOpen} onOpenChange={setNotificationsOpen}>
             <PopoverTrigger asChild>
