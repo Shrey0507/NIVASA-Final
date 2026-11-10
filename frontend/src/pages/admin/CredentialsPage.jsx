@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 
 const PAGE_SIZE = 25;
-const EMPTY_FORM = { full_name: "", email: "", username: "", usn: "", password: "", hostel: "boys", phone: "", department: "", year: 1 };
+const EMPTY_FORM = { full_name: "", email: "", username: "", usn: "", password: "", hostel: "boys", phone: "", department: "", year: 1, semester: "", guardian_name: "", guardian_phone: "", address: "" };
 
 export default function CredentialsPage() {
   const { role, userId } = useAuth();
@@ -137,7 +137,11 @@ export default function CredentialsPage() {
               <div><Label>Phone</Label><Input value={form.phone} onChange={(e) => updateForm("phone", e.target.value)} /></div>
               <div><Label>Year</Label><Input type="number" min="1" max="6" value={form.year} onChange={(e) => updateForm("year", Number(e.target.value))} /></div>
             </div>
-            <div><Label>Department</Label><Input value={form.department} onChange={(e) => updateForm("department", e.target.value)} /></div>
+            <div><Label>Department</Label><Input value={form.department} onChange={(e) => updateForm("department", e.target.value)} placeholder="e.g. Computer Science" /></div>
+            <div><Label>Semester</Label><Input value={form.semester} onChange={(e) => updateForm("semester", e.target.value)} placeholder="e.g. 3" /></div>
+            <div><Label>Guardian name</Label><Input value={form.guardian_name} onChange={(e) => updateForm("guardian_name", e.target.value)} /></div>
+            <div><Label>Guardian phone</Label><Input value={form.guardian_phone} onChange={(e) => updateForm("guardian_phone", e.target.value)} /></div>
+            <div><Label>Address</Label><Input value={form.address} onChange={(e) => updateForm("address", e.target.value)} /></div>
           </>}
           {error && <p className="text-sm text-destructive">{error}</p>}
           {message && <p className="text-sm text-success">{message}</p>}
