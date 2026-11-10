@@ -1,7 +1,7 @@
 import { apiRequest } from "@/lib/apiClient";
 
-export const getAccounts = async () =>
-  (await apiRequest("/accounts?limit=100")).data || [];
+export const getAccounts = async ({ page = 1, perPage = 25 } = {}) =>
+  apiRequest(`/accounts?page=${page}&perPage=${perPage}`);
 
 export const createStudentAccount = async (payload) =>
   (await apiRequest("/accounts/students", {
