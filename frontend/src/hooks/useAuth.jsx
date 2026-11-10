@@ -93,22 +93,25 @@ export function AuthProvider({ children }) {
   }, [loadSession]);
 
   /**
-   * Login: authenticate via Supabase directly, then loadSession handles
-   * fetching the trusted role from the backend.
+   * Login through the backend so student USNs can be resolved securely.
+   * The returned Supabase session is stored using the normal client SDK;
+   * the existing auth-state listener then loads the trusted role/profile.
    */
   const login = useCallback(async (identifier, password) => {
-    const email = identifier.includes("@")
-      ? identifier.trim().toLowerCase()
-      : identifier.trim();
-
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
+    const response = await apiRequest("/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ identifier: identifier.trim(), password }),
     });
-    if (error) {
-      throw new Error(error.message || "Invalid credentials.");
+
+    if (!response?.session?.access_token || !response?.session?.refresh_token) {
+      throw new Error("The server did not return a valid login session.");
     }
-    // onAuthStateChange will fire and call loadSession automatically
+
+    const { data, error } = await supabase.auth.setSession({
+      access_token: response.session.access_token,
+      refresh_token: response.session.refresh_token,
+    });
+    if (error) throw new Error(error.message || "Unable to establish login session.");
     return data;
   }, []);
 
