@@ -14,7 +14,8 @@ const PAGE_SIZE = 25;
 const EMPTY_FORM = { full_name: "", email: "", username: "", usn: "", password: "", hostel: "boys", phone: "", department: "", year: 1 };
 
 export default function CredentialsPage() {
-  const { role } = useAuth();
+  const { role, user, profile } = useAuth();
+  const currentEmail = profile?.email || (typeof user === "string" ? null : user?.email);
   const [accounts, setAccounts] = useState([]);
   const [form, setForm] = useState(EMPTY_FORM);
   const [mode, setMode] = useState("student");
@@ -175,7 +176,7 @@ export default function CredentialsPage() {
               <span>Account</span><span className="text-center">Role</span><span className="text-center">Status</span><span className="text-right">Actions</span>
             </div>
             <div className="divide-y">
-              {accounts.map((account) => <div key={account.id} className="grid grid-cols-1 items-center gap-2 px-3 py-2.5 sm:grid-cols-[minmax(0,2fr)_minmax(120px,0.8fr)_minmax(120px,0.8fr)_minmax(180px,1fr)] sm:gap-3">
+              {accounts.map((account) => <div key={account.id} className="grid grid-cols-1 items-center gap-2 px-3 py-2.5 sm:grid-cols-[minmax(0,2fr)_minmax(120px,0.8fr)_minmax(120px,0.8fr)_minmax(110px,0.6fr)] sm:gap-3">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold">{account.full_name || account.email}</p>
                   <p className="truncate text-xs text-muted-foreground">{account.email}{account.username ? ` · @${account.username}` : ""}</p>
@@ -184,7 +185,7 @@ export default function CredentialsPage() {
                 <div className="flex justify-center"><Badge variant="outline" className="text-[11px]">{account.role}</Badge></div>
                 <div className="flex justify-center"><Badge variant={account.status === "active" ? "secondary" : "destructive"} className="text-[11px]">{account.status}</Badge></div>
                 <div className="flex items-center justify-end">
-                  {role === "super" && account.role !== "super_admin" && <Button size="sm" variant="ghost" className="h-8 px-2 text-xs text-destructive hover:text-destructive" disabled={busyId === account.id} onClick={() => permanentlyRemoveAccount(account)} title="Permanently delete account"><Trash2 className="h-3.5 w-3.5" />{busyId === account.id ? "Deleting…" : "Delete"}</Button>}
+                  {role === "super" && account.email !== currentEmail && <Button size="sm" variant="ghost" className="h-8 px-2 text-xs text-destructive hover:text-destructive" disabled={busyId === account.id} onClick={() => permanentlyRemoveAccount(account)} title="Permanently delete account"><Trash2 className="h-3.5 w-3.5" />{busyId === account.id ? "Deleting…" : "Delete"}</Button>}
                 </div>
               </div>)}
             </div>
