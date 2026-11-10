@@ -17,14 +17,14 @@ const router = Router();
 router.get("/", async (req, res, next) => {
   try {
     // Use Supabase Auth admin API to list users
-    const { data, error } = await req.supabaseAdmin.auth.admin.listUsers({
-      page: 1,
-      perPage: 100,
-    });
+    const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+    const perPage = Math.min(100, Math.max(1, Number.parseInt(req.query.perPage, 10) || 25));
+    const { data, error } = await req.supabaseAdmin.auth.admin.listUsers({ page, perPage });
     if (error) throw error;
 
-    // Map to safe output — never expose tokens/secrets
-    const accounts = (data?.users || []).map((u) => ({
+    // Map to safe output — never expose tokens/secrets. Apply hostel scope
+    // before returning accounts to hostel administrators.
+    let accounts = (data?.users || []).map((u) => ({
       id: u.id,
       email: u.email,
       full_name: u.user_metadata?.full_name || u.email,
@@ -34,8 +34,25 @@ router.get("/", async (req, res, next) => {
       status: u.banned_until ? "deactivated" : "active",
       created_at: u.created_at,
     }));
+    if (req.hostelScope) {
+      accounts = accounts.filter((account) =>
+        account.role === "student"
+          ? account.hostel === req.hostelScope
+          : account.role === (req.hostelScope === "boys" ? "boys_admin" : "girls_admin")
+      );
+    }
 
-    res.json({ data: accounts });
+    res.json({
+      data: accounts,
+      pagination: {
+        page,
+        perPage,
+        hasMore: Boolean(data?.nextPage),
+        nextPage: data?.nextPage || null,
+        lastPage: data?.lastPage || null,
+        total: data?.total ?? null,
+      },
+    });
   } catch (err) {
     next(err);
   }
