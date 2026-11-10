@@ -36,7 +36,10 @@ export async function apiRequest(path, options = {}) {
       (typeof payload?.error === "string" ? payload.error : null) ||
       (responseText && responseText.length < 300 ? responseText : null) ||
       `Request failed (HTTP ${response.status})`;
-    throw new Error(message);
+    const requestError = new Error(message);
+    requestError.status = response.status;
+    requestError.retryAfter = Number(payload?.retryAfter || response.headers.get("Retry-After") || 0);
+    throw requestError;
   }
 
   return payload;
