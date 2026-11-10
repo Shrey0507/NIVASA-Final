@@ -242,11 +242,8 @@ router.delete("/:id", requireSuperAdmin, async (req, res, next) => {
       });
     }
 
-    // Remove the Auth identity first. The students.auth_id FK is ON DELETE SET NULL,
-    // so student data remains intact if the following cleanup needs manual recovery.
-    const { error: deleteAuthError } = await admin.auth.admin.deleteUser(accountId);
-    if (deleteAuthError) throw deleteAuthError;
-
+    // Capture the linked student row BEFORE deleting Auth. Its FK is ON DELETE SET NULL.
+    let linkedStudentId = null;
     if (targetRole === "student") {
       const { data: linkedStudent, error: studentLookupError } = await admin
         .from("students")
@@ -254,23 +251,30 @@ router.delete("/:id", requireSuperAdmin, async (req, res, next) => {
         .eq("auth_id", accountId)
         .maybeSingle();
       if (studentLookupError) throw studentLookupError;
+      linkedStudentId = linkedStudent?.id || null;
+    }
 
-      if (linkedStudent?.id) {
-        const { error: studentDeleteError } = await admin
-          .from("students")
-          .delete()
-          .eq("id", linkedStudent.id);
-        if (studentDeleteError) {
-          console.error("[ACCOUNT_DELETE_PARTIAL]", {
-            accountId,
-            message: studentDeleteError.message,
-          });
-          return res.status(500).json({
-            error: {
-              message: "The login was deleted, but the linked student record could not be removed. Please contact the system administrator to finish cleanup.",
-            },
-          });
-        }
+    const { error: deleteAuthError } = await admin.auth.admin.deleteUser(accountId);
+    if (deleteAuthError) throw deleteAuthError;
+
+    // The students.auth_id FK becomes NULL on Auth deletion, so delete by the
+    // captured student primary key. Dependent rows with ON DELETE CASCADE follow.
+    if (linkedStudentId) {
+      const { error: studentDeleteError } = await admin
+        .from("students")
+        .delete()
+        .eq("id", linkedStudentId);
+      if (studentDeleteError) {
+        console.error("[ACCOUNT_DELETE_PARTIAL]", {
+          accountId,
+          studentId: linkedStudentId,
+          message: studentDeleteError.message,
+        });
+        return res.status(500).json({
+          error: {
+            message: "The login was deleted, but the linked student record could not be removed. Please contact the system administrator to finish cleanup.",
+          },
+        });
       }
     }
 
