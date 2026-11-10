@@ -131,6 +131,9 @@ export const createRoom = async (data) =>
     }),
   })));
 
+export const getRoomAllocations = async (roomId) =>
+  (await apiRequest(`/allocations?room_id=${encodeURIComponent(roomId)}`)).data || [];
+
 export const allocateRoom = async (studentId, roomId) =>
   apiRequest("/allocations", {
     method: "POST",
