@@ -87,7 +87,9 @@ export default function CredentialsPage() {
     try {
       await permanentlyDeleteAccount(account.id);
       setMessage(`${account.full_name || account.email} was permanently deleted.`);
-      await load();
+      // Move back if deleting the only row on this page.
+      if (accounts.length === 1 && page > 1) setPage((current) => current - 1);
+      else await load();
     } catch (e) {
       setError(e.message || "Could not permanently delete account.");
     } finally {
@@ -185,15 +187,25 @@ export default function CredentialsPage() {
 
         {loading ? <p className="py-10 text-center text-sm text-muted-foreground">Loading accounts…</p> :
           accounts.length === 0 ? <EmptyState title="No accounts found" description="Try another search term or clear the filters." /> :
-          <div className="space-y-2">
-            {accounts.map((account) => <div key={account.id} className="flex flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="min-w-0"><p className="truncate font-medium">{account.full_name || account.email}</p><p className="break-all text-sm text-muted-foreground">{account.email} · {account.username ? `@${account.username}` : "No username"}</p><p className="mt-1 text-xs text-muted-foreground">{account.hostel ? `${account.hostel} hostel` : account.id}</p></div>
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="outline">{account.role}</Badge><Badge variant={account.status === "active" ? "secondary" : "destructive"}>{account.status}</Badge>
-                {account.status === "active" && <Button size="sm" variant="outline" disabled={busyId === account.id || (account.role === "super_admin" && role !== "super")} onClick={() => removeAccount(account)}><UserX />{busyId === account.id ? "Removing…" : "Deactivate"}</Button>}
-                {role === "super" && account.role !== "super_admin" && <Button size="sm" variant="destructive" disabled={busyId === account.id} onClick={() => permanentlyRemoveAccount(account)} title="Permanently delete account"><Trash2 />{busyId === account.id ? "Deleting…" : "Delete permanently"}</Button>}
-              </div>
-            </div>)}
+          <div className="overflow-hidden rounded-lg border">
+            <div className="hidden grid-cols-[minmax(0,1.7fr)_minmax(110px,0.7fr)_minmax(100px,0.6fr)_auto] items-center gap-3 border-b bg-muted/30 px-3 py-2 text-xs font-medium text-muted-foreground sm:grid">
+              <span>Account</span><span>Role</span><span>Status</span><span className="text-right">Actions</span>
+            </div>
+            <div className="divide-y">
+              {accounts.map((account) => <div key={account.id} className="grid grid-cols-1 items-center gap-2 px-3 py-2.5 sm:grid-cols-[minmax(0,1.7fr)_minmax(110px,0.7fr)_minmax(100px,0.6fr)_auto] sm:gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold">{account.full_name || account.email}</p>
+                  <p className="truncate text-xs text-muted-foreground">{account.email}{account.username ? ` · @${account.username}` : ""}</p>
+                  {account.hostel && <p className="text-[11px] text-muted-foreground">{account.hostel} hostel</p>}
+                </div>
+                <div><Badge variant="outline" className="text-[11px]">{account.role}</Badge></div>
+                <div><Badge variant={account.status === "active" ? "secondary" : "destructive"} className="text-[11px]">{account.status}</Badge></div>
+                <div className="flex flex-wrap items-center justify-start gap-1 sm:justify-end">
+                  {account.status === "active" && <Button size="sm" variant="ghost" className="h-8 px-2 text-xs" disabled={busyId === account.id || (account.role === "super_admin" && role !== "super")} onClick={() => removeAccount(account)} title="Deactivate account"><UserX className="h-3.5 w-3.5" />Deactivate</Button>}
+                  {role === "super" && account.role !== "super_admin" && <Button size="sm" variant="ghost" className="h-8 px-2 text-xs text-destructive hover:text-destructive" disabled={busyId === account.id} onClick={() => permanentlyRemoveAccount(account)} title="Permanently delete account"><Trash2 className="h-3.5 w-3.5" />{busyId === account.id ? "Deleting…" : "Delete"}</Button>}
+                </div>
+              </div>)}
+            </div>
           </div>
         }
         <div className="mt-5 flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
