@@ -91,7 +91,7 @@ router.get("/", async (req, res, next) => {
 router.post("/students", async (req, res, next) => {
   let createdUserId = null;
   try {
-    const { email, password, full_name, usn, hostel, phone, department, year } = req.body;
+    const { email, password, full_name, usn, hostel, phone, department, year, semester, guardian_name, guardian_phone, address } = req.body;
     if (!email || !full_name || !usn || !password) {
       return res.status(400).json({
         error: { message: "Full name, email, student ID / USN, and password are required." },
@@ -142,7 +142,11 @@ router.post("/students", async (req, res, next) => {
         hostel: targetHostel,
         phone: phone || null,
         department: department || null,
-        year: year == null ? null : String(year),
+        year: year == null || year === "" ? null : String(year),
+        semester: semester || null,
+        guardian_name: guardian_name || null,
+        guardian_phone: guardian_phone || null,
+        address: address || null,
         status: "active",
       })
       .select()
