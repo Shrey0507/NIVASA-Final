@@ -40,9 +40,34 @@ publicRouter.post("/login", async (req, res, next) => {
     // Create admin client directly — NOT from req (we're pre-auth)
     const admin = getAdminClient();
 
-    const email = identifier.includes("@")
-      ? identifier.trim().toLowerCase()
-      : identifier.trim();
+    let email = identifier.trim().toLowerCase();
+
+    // Student accounts may sign in with their USN. Resolve the USN to the
+    // linked Auth user on the server; never expose this lookup to the client.
+    if (!email.includes("@")) {
+      const { data: student, error: studentErr } = await admin
+        .from("students")
+        .select("auth_id, status")
+        .ilike("usn", identifier.trim())
+        .maybeSingle();
+
+      if (studentErr || !student?.auth_id || student.status !== "active") {
+        return res.status(401).json({
+          error: { message: "Invalid credentials. Please check your ID and password." },
+        });
+      }
+
+      const { data: authUser, error: authUserErr } =
+        await admin.auth.admin.getUserById(student.auth_id);
+
+      if (authUserErr || !authUser?.user?.email) {
+        return res.status(401).json({
+          error: { message: "Invalid credentials. Please check your ID and password." },
+        });
+      }
+
+      email = authUser.user.email.toLowerCase();
+    }
 
     const { data: signInData, error: signInErr } =
       await admin.auth.signInWithPassword({ email, password });
