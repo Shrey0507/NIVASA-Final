@@ -78,17 +78,23 @@ export default function LoginPage({ initialMode }) {
     event.preventDefault();
     setError("");
     setMessage("");
+    if (lockUntil > Date.now()) return;
     if (!form.identifier.trim() || !form.password)
       return setError("Email/username and password are required.");
     setLoading(true);
     try {
       await login(form.identifier, form.password, mode);
-      // After login, onAuthStateChange fires → loadSession → role is set
-      // The useEffect above handles redirect based on role
     } catch (err) {
-      setError(
-        err?.message || "Unable to sign in. Check your credentials or contact the hostel office."
-      );
+      if (err?.status === 429) {
+        const retryAfter = Math.max(1, Number(err.retryAfter) || 30);
+        setLockUntil(Date.now() + retryAfter * 1000);
+        setSecondsRemaining(retryAfter);
+        setError("Too many failed attempts. Login is temporarily locked.");
+      } else {
+        setError(
+          err?.message || "Unable to sign in. Check your credentials or contact the hostel office."
+        );
+      }
     } finally {
       setLoading(false);
     }
@@ -201,16 +207,18 @@ export default function LoginPage({ initialMode }) {
               type="button"
               aria-label={showPassword ? "Hide password" : "Show password"}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-white/50"
-              onClick={() => setShowPassword(!showPassword)}
-            >
-              {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-            </button>
+                  {error && <p role="alert" className="text-sm text-rose-300">{error}</p>}
+        {secondsRemaining > 0 && (
+          <div role="status" aria-live="polite" className="rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-3 text-center">
+            <p className="text-sm font-medium text-amber-200">Please wait before trying again</p>
+            <p className="mt-1 text-2xl font-semibold tabular-nums text-white">00:{String(secondsRemaining).padStart(2, "0")}</p>
+            <p className="mt-1 text-xs text-white/60">Login will unlock automatically when the timer ends.</p>
           </div>
-        </div>
-        {error && <p role="alert" className="text-sm text-rose-300">{error}</p>}\n        {secondsRemaining > 0 && (\n          <div role="status" aria-live="polite" className="rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-3 text-center">\n            <p className="text-sm font-medium text-amber-200">Please wait before trying again</p>\n            <p className="mt-1 text-2xl font-semibold tabular-nums text-white">00:{String(secondsRemaining).padStart(2, "0")}</p>\n            <p className="mt-1 text-xs text-white/60">Login will unlock automatically when the timer ends.</p>\n          </div>\n        )}
+        )}
+ums text-white">00:{String(secondsRemaining).padStart(2, "0")}</p>\n            <p className="mt-1 text-xs text-white/60">Login will unlock automatically when the timer ends.</p>\n          </div>\n        )}
         {message && <p className="text-sm text-emerald-300">{message}</p>}
-        <Button type="submit" className="w-full" disabled={loading}>
-          {loading ? "Signing in\u2026" : "Sign in"}
+        <Button type="submit" className="w-full" disabled={loading || secondsRemaining > 0}>
+          {loading ? "Signing in\u2026" : secondsRemaining > 0 ? `Try again in ${secondsRemaining}s` : "Sign in"}
           {!loading && <ArrowRight className="ml-1 size-4" />}
         </Button>
         <button
