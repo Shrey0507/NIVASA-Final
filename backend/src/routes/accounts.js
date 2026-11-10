@@ -236,11 +236,8 @@ router.delete("/:id", requireSuperAdmin, async (req, res, next) => {
 
     const target = targetResult.user;
     const targetRole = target.app_metadata?.role || target.user_metadata?.role;
-    if (targetRole === "super_admin") {
-      return res.status(400).json({
-        error: { message: "A super-admin account cannot be permanently deleted from this screen." },
-      });
-    }
+    // Super admins may delete other admin accounts, but never their own account.
+    // The authenticated caller is protected by the self-deletion check above.
 
     // Capture the linked student row BEFORE deleting Auth. Its FK is ON DELETE SET NULL.
     let linkedStudentId = null;
