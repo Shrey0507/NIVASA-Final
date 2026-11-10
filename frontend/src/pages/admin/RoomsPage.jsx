@@ -296,14 +296,14 @@ export default function RoomsPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-7 pb-6">
       <PageHeader
         title="Room Management"
         description="Manage hostel rooms, occupancy and bed availability."
       />
 
       {/* Hostel tabs */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-4 rounded-2xl border border-border/70 bg-card/70 p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
         <Tabs
           value={hostel}
           onValueChange={(value) => {
@@ -326,8 +326,8 @@ export default function RoomsPage() {
       </div>
 
       {/* Summary cards */}
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="rounded-xl border bg-card p-5">
+      <div className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-4">
+        <div className="group rounded-2xl border border-border/70 bg-card p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md">
           <div className="flex items-center justify-between">
             <p className="text-sm text-muted-foreground">Total Rooms</p>
             <Building2 className="h-5 w-5 text-muted-foreground" />
@@ -373,8 +373,8 @@ export default function RoomsPage() {
       </div>
 
       {/* Occupancy */}
-      <div className="rounded-xl border bg-card p-5">
-        <div className="mb-3 flex items-center justify-between">
+      <div className="rounded-2xl border border-border/70 bg-card p-5 shadow-sm">
+        <div className="mb-4 flex items-center justify-between">
           <div>
             <h3 className="font-semibold">Overall Occupancy</h3>
             <p className="text-sm text-muted-foreground">
@@ -387,7 +387,7 @@ export default function RoomsPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col gap-3 rounded-xl border bg-card p-4 md:flex-row md:flex-wrap">
+      <div className="flex flex-col gap-3 rounded-2xl border border-border/70 bg-card/80 p-4 shadow-sm md:flex-row md:flex-wrap">
         <div className="relative min-w-[200px] flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -456,9 +456,9 @@ export default function RoomsPage() {
 
       {/* Room cards */}
       {loading ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
           {Array.from({ length: 8 }).map((_, index) => (
-            <div key={index} className="space-y-3 rounded-xl border p-5">
+            <div key={index} className="space-y-3 rounded-2xl border border-border/70 bg-card p-5 shadow-sm">
               <Skeleton className="h-5 w-24" />
               <Skeleton className="h-4 w-32" />
               <Skeleton className="h-2 w-full" />
@@ -467,7 +467,7 @@ export default function RoomsPage() {
           ))}
         </div>
       ) : !error && rooms.length === 0 ? (
-        <div className="rounded-xl border border-dashed p-10 text-center">
+        <div className="rounded-2xl border border-dashed border-border/80 bg-card/50 p-12 text-center shadow-sm">
           <BedDouble className="mx-auto h-10 w-10 text-muted-foreground" />
           <h3 className="mt-3 font-semibold">No rooms found</h3>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -492,14 +492,14 @@ export default function RoomsPage() {
             return (
               <div
                 key={room.id || room.room_number || room.number}
-                className="rounded-xl border bg-card p-5 transition-shadow hover:shadow-md"
+                className="group relative overflow-hidden rounded-2xl border border-border/70 bg-card p-5 shadow-sm transition-all duration-200 hover:-translate-y-1 hover:border-primary/30 hover:shadow-lg"
               >
-                <div className="flex items-start justify-between gap-2">
+                <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="text-xs text-muted-foreground">
-                      ROOM NUMBER
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                      Room number
                     </p>
-                    <h3 className="mt-1 text-xl font-bold">
+                    <h3 className="mt-1 text-2xl font-bold tracking-tight">
                       {room.number || room.room_number}
                     </h3>
                   </div>
@@ -517,7 +517,7 @@ export default function RoomsPage() {
                   </span>
                 </div>
 
-                <div className="mt-5">
+                <div className="mt-6 rounded-xl bg-muted/40 p-3">
                   <div className="mb-2 flex justify-between text-sm">
                     <span className="text-muted-foreground">
                       Bed occupancy
@@ -535,7 +535,7 @@ export default function RoomsPage() {
 
                 <Button
                   variant="outline"
-                  className="mt-5 w-full"
+                  className="mt-4 w-full rounded-xl"
                   onClick={() => setSelectedRoom(room)}
                 >
                   View Room Details
@@ -719,7 +719,7 @@ export default function RoomsPage() {
                   </div>
                 </div>
 
-                <div className="space-y-3 rounded-lg border p-4">
+                <div className="space-y-4 rounded-xl border border-border/70 bg-muted/20 p-4">
                   <div className="flex items-center justify-between gap-2">
                     <div>
                       <h4 className="font-semibold">Assigned students</h4>
@@ -765,7 +765,7 @@ export default function RoomsPage() {
                   </div>
                 </div>
 
-                <div className="rounded-lg border p-4">
+                <div className="rounded-xl border border-border/70 bg-muted/20 p-4">
                   <div className="mb-2 flex justify-between text-sm">
                     <span className="text-muted-foreground">
                       Occupancy
