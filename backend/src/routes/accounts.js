@@ -16,15 +16,32 @@ const router = Router();
 /** GET /api/accounts — list all managed accounts */
 router.get("/", async (req, res, next) => {
   try {
-    // Use Supabase Auth admin API to list users
     const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
     const perPage = Math.min(100, Math.max(1, Number.parseInt(req.query.perPage, 10) || 25));
-    const { data, error } = await req.supabaseAdmin.auth.admin.listUsers({ page, perPage });
-    if (error) throw error;
+    const search = String(req.query.search || "").trim().toLowerCase();
+    const roleFilter = String(req.query.role || "").trim();
+    const statusFilter = String(req.query.status || "").trim();
+    const admin = req.supabaseAdmin;
 
-    // Map to safe output — never expose tokens/secrets. Apply hostel scope
-    // before returning accounts to hostel administrators.
-    let accounts = (data?.users || []).map((u) => ({
+    // Search/filter across all Auth pages so a user is discoverable even
+    // when they are not on the currently displayed page.
+    const users = [];
+    if (search || roleFilter || statusFilter || req.hostelScope) {
+      let authPage = 1;
+      while (authPage <= 100) {
+        const { data, error } = await admin.auth.admin.listUsers({ page: authPage, perPage: 100 });
+        if (error) throw error;
+        users.push(...(data?.users || []));
+        if (!data?.nextPage || !(data?.users || []).length) break;
+        authPage += 1;
+      }
+    } else {
+      const { data, error } = await admin.auth.admin.listUsers({ page, perPage });
+      if (error) throw error;
+      users.push(...(data?.users || []));
+    }
+
+    let accounts = users.map((u) => ({
       id: u.id,
       email: u.email,
       full_name: u.user_metadata?.full_name || u.email,
@@ -34,6 +51,7 @@ router.get("/", async (req, res, next) => {
       status: u.banned_until ? "deactivated" : "active",
       created_at: u.created_at,
     }));
+
     if (req.hostelScope) {
       accounts = accounts.filter((account) =>
         account.role === "student"
@@ -41,16 +59,23 @@ router.get("/", async (req, res, next) => {
           : account.role === (req.hostelScope === "boys" ? "boys_admin" : "girls_admin")
       );
     }
+    if (search) {
+      accounts = accounts.filter((a) =>
+        [a.full_name, a.email, a.username, a.id].some((v) => String(v || "").toLowerCase().includes(search))
+      );
+    }
+    if (roleFilter) accounts = accounts.filter((a) => a.role === roleFilter);
+    if (statusFilter) accounts = accounts.filter((a) => a.status === statusFilter);
 
+    const total = accounts.length;
+    const startIndex = (page - 1) * perPage;
+    const data = accounts.slice(startIndex, startIndex + perPage);
     res.json({
-      data: accounts,
+      data,
       pagination: {
-        page,
-        perPage,
-        hasMore: Boolean(data?.nextPage),
-        nextPage: data?.nextPage || null,
-        lastPage: data?.lastPage || null,
-        total: data?.total ?? null,
+        page, perPage, total,
+        hasMore: startIndex + perPage < total,
+        totalPages: Math.max(1, Math.ceil(total / perPage)),
       },
     });
   } catch (err) {
