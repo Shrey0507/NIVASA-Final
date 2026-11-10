@@ -188,18 +188,18 @@ export default function CredentialsPage() {
         {loading ? <p className="py-10 text-center text-sm text-muted-foreground">Loading accounts…</p> :
           accounts.length === 0 ? <EmptyState title="No accounts found" description="Try another search term or clear the filters." /> :
           <div className="overflow-hidden rounded-lg border">
-            <div className="hidden grid-cols-[minmax(0,1.7fr)_minmax(110px,0.7fr)_minmax(100px,0.6fr)_auto] items-center gap-3 border-b bg-muted/30 px-3 py-2 text-xs font-medium text-muted-foreground sm:grid">
-              <span>Account</span><span>Role</span><span>Status</span><span className="text-right">Actions</span>
+            <div className="hidden grid-cols-[minmax(0,2fr)_minmax(120px,0.8fr)_minmax(120px,0.8fr)_minmax(180px,1fr)] items-center gap-3 border-b bg-muted/30 px-3 py-2 text-xs font-medium text-muted-foreground sm:grid">
+              <span>Account</span><span className="text-center">Role</span><span className="text-center">Status</span><span className="text-right">Actions</span>
             </div>
             <div className="divide-y">
-              {accounts.map((account) => <div key={account.id} className="grid grid-cols-1 items-center gap-2 px-3 py-2.5 sm:grid-cols-[minmax(0,1.7fr)_minmax(110px,0.7fr)_minmax(100px,0.6fr)_auto] sm:gap-3">
+              {accounts.map((account) => <div key={account.id} className="grid grid-cols-1 items-center gap-2 px-3 py-2.5 sm:grid-cols-[minmax(0,2fr)_minmax(120px,0.8fr)_minmax(120px,0.8fr)_minmax(180px,1fr)] sm:gap-3">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold">{account.full_name || account.email}</p>
                   <p className="truncate text-xs text-muted-foreground">{account.email}{account.username ? ` · @${account.username}` : ""}</p>
                   {account.hostel && <p className="text-[11px] text-muted-foreground">{account.hostel} hostel</p>}
                 </div>
-                <div><Badge variant="outline" className="text-[11px]">{account.role}</Badge></div>
-                <div><Badge variant={account.status === "active" ? "secondary" : "destructive"} className="text-[11px]">{account.status}</Badge></div>
+                <div className="flex justify-center"><Badge variant="outline" className="text-[11px]">{account.role}</Badge></div>
+                <div className="flex justify-center"><Badge variant={account.status === "active" ? "secondary" : "destructive"} className="text-[11px]">{account.status}</Badge></div>
                 <div className="flex flex-wrap items-center justify-start gap-1 sm:justify-end">
                   {account.status === "active" && <Button size="sm" variant="ghost" className="h-8 px-2 text-xs" disabled={busyId === account.id || (account.role === "super_admin" && role !== "super")} onClick={() => removeAccount(account)} title="Deactivate account"><UserX className="h-3.5 w-3.5" />Deactivate</Button>}
                   {role === "super" && account.role !== "super_admin" && <Button size="sm" variant="ghost" className="h-8 px-2 text-xs text-destructive hover:text-destructive" disabled={busyId === account.id} onClick={() => permanentlyRemoveAccount(account)} title="Permanently delete account"><Trash2 className="h-3.5 w-3.5" />{busyId === account.id ? "Deleting…" : "Delete"}</Button>}
