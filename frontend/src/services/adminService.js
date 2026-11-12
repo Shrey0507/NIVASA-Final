@@ -234,3 +234,6 @@ export const updateMessMenu = async (id, data) =>
     method: "PATCH",
     body: JSON.stringify(data),
   }));
+
+export const getMessFeedback = async () =>
+  (await apiRequest("/mess/feedback?limit=200")).data || [];
