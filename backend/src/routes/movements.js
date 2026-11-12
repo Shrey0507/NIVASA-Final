@@ -4,7 +4,7 @@ const router = Router();
 const ADMIN = ["super_admin", "boys_admin", "girls_admin"];
 
 async function studentFor(req) {
-  const { data, error } = await req.supabaseAdmin.from("students").select("id,hostel,room_number,full_name,usn").eq("auth_id", req.userId).maybeSingle();
+  const { data, error } = await req.supabaseAdmin.from("students").select("id,hostel,full_name,usn,rooms(room_number)").eq("auth_id", req.userId).maybeSingle();
   if (error) throw error;
   return data;
 }
@@ -13,7 +13,7 @@ function isAdmin(req) { return ADMIN.includes(req.role); }
 router.get("/", async (req, res, next) => {
   try {
     const { student_id, status, movement_type, limit = 100 } = req.query;
-    let query = req.supabaseAdmin.from("movements").select("*, students(full_name, usn, room_number)").order("created_at", { ascending: false }).limit(Math.min(Number(limit) || 100, 200));
+    let query = req.supabaseAdmin.from("movements").select("*, students(full_name, usn, rooms(room_number))").order("created_at", { ascending: false }).limit(Math.min(Number(limit) || 100, 200));
     if (req.role === "student") {
       const student = await studentFor(req);
       if (!student) return res.json({ data: [] });
@@ -53,7 +53,7 @@ router.post("/", async (req, res, next) => {
         student_id: student.id,
         student_name: student.full_name,
         usn: student.usn,
-        room: student.room_number,
+        room: student.rooms?.room_number || null,
         hostel: student.hostel,
         status: "pending",
       };
@@ -62,7 +62,7 @@ router.post("/", async (req, res, next) => {
       payload.student_id = studentId || null;
       if (req.hostelScope) payload.hostel = req.hostelScope;
     }
-    const { data, error } = await req.supabaseAdmin.from("movements").insert(payload).select("*, students(full_name,usn,room_number)").single();
+    const { data, error } = await req.supabaseAdmin.from("movements").insert(payload).select("*, students(full_name,usn,rooms(room_number))").single();
     if (error) throw error;
     res.status(201).json({ data });
   } catch (err) { next(err); }
@@ -76,7 +76,7 @@ router.post("/:id/approve", requireAdmin, async (req, res, next) => {
     if (!current) return res.status(404).json({ error: { message: "Movement request not found." } });
     if (req.hostelScope && current.hostel !== req.hostelScope) return res.status(403).json({ error: { message: "This request belongs to another hostel." } });
     if (current.status !== "pending") return res.status(409).json({ error: { message: "Only pending requests can be approved." } });
-    const { data, error } = await req.supabaseAdmin.from("movements").update({ status: "approved", approved_at: new Date().toISOString(), approved_by: req.userId, remarks: req.body.remarks || null, updated_at: new Date().toISOString() }).eq("id", req.params.id).select("*, students(full_name,usn,room_number)").single();
+    const { data, error } = await req.supabaseAdmin.from("movements").update({ status: "approved", approved_at: new Date().toISOString(), approved_by: req.userId, remarks: req.body.remarks || null, updated_at: new Date().toISOString() }).eq("id", req.params.id).select("*, students(full_name,usn,rooms(room_number))").single();
     if (error) throw error;
     res.json({ data });
   } catch (err) { next(err); }
@@ -89,7 +89,7 @@ router.post("/:id/reject", requireAdmin, async (req, res, next) => {
     if (!current) return res.status(404).json({ error: { message: "Movement request not found." } });
     if (req.hostelScope && current.hostel !== req.hostelScope) return res.status(403).json({ error: { message: "This request belongs to another hostel." } });
     if (current.status !== "pending") return res.status(409).json({ error: { message: "Only pending requests can be rejected." } });
-    const { data, error } = await req.supabaseAdmin.from("movements").update({ status: "rejected", rejected_at: new Date().toISOString(), rejected_by: req.userId, remarks: req.body.remarks || null, updated_at: new Date().toISOString() }).eq("id", req.params.id).select("*, students(full_name,usn,room_number)").single();
+    const { data, error } = await req.supabaseAdmin.from("movements").update({ status: "rejected", rejected_at: new Date().toISOString(), rejected_by: req.userId, remarks: req.body.remarks || null, updated_at: new Date().toISOString() }).eq("id", req.params.id).select("*, students(full_name,usn,rooms(room_number))").single();
     if (error) throw error;
     res.json({ data });
   } catch (err) { next(err); }
