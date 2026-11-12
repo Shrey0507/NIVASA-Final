@@ -419,7 +419,7 @@ export default function MovementsPage() {
                     <StatusBadge status={r.status} />
                   </TableCell>
                   <TableCell className="text-right">
-                    {r.status === "out" ? (
+                    {["out", "approved"].includes(r.status) ? (
                       <Button
                         variant="outline"
                         size="sm"
