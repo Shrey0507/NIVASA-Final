@@ -1,56 +1,7 @@
-import { Router } from "express";
-import { requireAdmin } from "../middleware/authorize.js";
-const router = Router();
-
-/**
- * GET /api/mess
- *
- * Both admins and students can read the mess menu.
- */
-router.get("/", async (req, res, next) => {
-  try {
-    const { limit = 100 } = req.query;
-    const { data, error } = await req.supabaseAdmin
-      .from("mess")
-      .select("*")
-      .order("day", { ascending: true })
-      .limit(Number(limit));
-    if (error) throw error;
-    res.json({ data });
-  } catch (err) {
-    next(err);
-  }
-});
-
-/** POST /api/mess — admin only */
-router.post("/", requireAdmin, async (req, res, next) => {
-  try {
-    const { data, error } = await req.supabaseAdmin
-      .from("mess")
-      .insert(req.body)
-      .select()
-      .single();
-    if (error) throw error;
-    res.status(201).json({ data });
-  } catch (err) {
-    next(err);
-  }
-});
-
-/** PATCH /api/mess/:id — admin only */
-router.patch("/:id", requireAdmin, async (req, res, next) => {
-  try {
-    const { data, error } = await req.supabaseAdmin
-      .from("mess")
-      .update(req.body)
-      .eq("id", req.params.id)
-      .select()
-      .single();
-    if (error) throw error;
-    res.json({ data });
-  } catch (err) {
-    next(err);
-  }
-});
-
+import {Router} from "express";import {requireAdmin} from "../middleware/authorize.js";const router=Router();
+router.get("/",async(req,res,next)=>{try{const {limit=100}=req.query;let q=req.supabaseAdmin.from("mess").select("*").order("day",{ascending:true}).limit(Number(limit));if(req.role==="student"){const {data:s}=await req.supabaseAdmin.from("students").select("hostel").eq("auth_id",req.userId).maybeSingle();if(s?.hostel)q=q.in("hostel",[s.hostel,"all"]);}const {data,error}=await q;if(error)throw error;res.json({data});}catch(e){next(e);}});
+router.post("/",requireAdmin,async(req,res,next)=>{try{const {data,error}=await req.supabaseAdmin.from("mess").insert(req.body).select().single();if(error)throw error;res.status(201).json({data});}catch(e){next(e);}});
+router.patch("/:id",requireAdmin,async(req,res,next)=>{try{const {data,error}=await req.supabaseAdmin.from("mess").update(req.body).eq("id",req.params.id).select().single();if(error)throw error;res.json({data});}catch(e){next(e);}});
+router.post("/feedback",async(req,res,next)=>{try{if(req.role!=="student")return res.status(403).json({error:{message:"Only students can submit meal feedback."}});const {data:s,error:se}=await req.supabaseAdmin.from("students").select("id").eq("auth_id",req.userId).maybeSingle();if(se)throw se;if(!s)return res.status(400).json({error:{message:"No student record linked to this account."}});const {meal,day,rating,comment}=req.body;if(!["Breakfast","Lunch","Evening snacks","Dinner"].includes(meal)||!["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"].includes(day)||!Number.isInteger(Number(rating))||Number(rating)<1||Number(rating)>5)return res.status(400).json({error:{message:"Invalid meal feedback."}});const {data,error}=await req.supabaseAdmin.from("mess_feedback").insert({student_id:s.id,meal,menu_day:day,rating:Number(rating),comment:typeof comment==="string"?comment.trim().slice(0,1000):null}).select("id,meal,menu_day,rating,created_at").single();if(error)throw error;res.status(201).json({data});}catch(e){next(e);}});
+router.get("/feedback",requireAdmin,async(req,res,next)=>{try{const {data,error}=await req.supabaseAdmin.from("mess_feedback").select("*, students(full_name,usn)").order("created_at",{ascending:false}).limit(200);if(error)throw error;res.json({data});}catch(e){next(e);}});
 export default router;
