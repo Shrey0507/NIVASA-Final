@@ -8,7 +8,8 @@ export async function getMyGrievances() { return (await apiRequest("/grievances?
 export async function createMyGrievance(payload) { return mapGrievance((await apiRequest("/grievances", { method: "POST", body: JSON.stringify({ title: payload.subject, category: payload.category, description: payload.description }) })).data); }
 export async function getMyMovements() { return (await apiRequest("/movements?limit=100")).data?.map(mapMovement) || []; }
 export async function createMyMovement(payload) { return mapMovement((await apiRequest("/movements", { method: "POST", body: JSON.stringify({ movement_type: payload.type, reason: payload.reason, destination: payload.destination || "", expected_return_time: new Date(payload.requestedDateTime).toISOString() }) })).data); }
-export async function cancelMyMovement(id) { return apiRequest(`/movements/${id}/return`, { method: "POST" }); }\nexport async function cancelPendingMovement(id) { return apiRequest(`/movements/${id}/cancel`, { method: "POST" }); }
+export async function cancelMyMovement(id) { return apiRequest(`/movements/${id}/return`, { method: "POST" }); }
+export async function cancelPendingMovement(id) { return apiRequest(`/movements/${id}/cancel`, { method: "POST" }); }
 export async function getMyNotices() { return (await apiRequest("/notices?limit=100")).data?.map(mapNotice) || []; }
 export async function getMyMess() { return (await apiRequest("/mess?limit=100")).data || []; }
 export function summarizeFees(records) { const totalBilled = records.reduce((sum, r) => sum + Number(r.amount || 0), 0); const totalPaid = records.reduce((sum, r) => sum + Number(r.paid || 0), 0); const outstanding = Math.max(0, totalBilled - totalPaid); const nextDueDate = records.filter((r) => Number(r.balance || 0) > 0 && r.dueDate).sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate))[0]?.dueDate || null; return { totalBilled, totalPaid, outstanding, nextDueDate }; }
