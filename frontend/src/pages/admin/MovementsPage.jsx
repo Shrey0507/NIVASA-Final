@@ -72,7 +72,8 @@ function IncomingRequests() {
   const { hostel, role, user } = useAuth();
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [actionLoading, setActionLoading] = useState(null);\n  const [actionError, setActionError] = useState("");
+  const [actionLoading, setActionLoading] = useState(null);
+  const [actionError, setActionError] = useState("");
 
   const loadRequests = useCallback(async () => {
     setLoading(true);
@@ -160,7 +161,8 @@ function IncomingRequests() {
         </Badge>
       }
     >
-      {actionError && <p className="mb-3 text-sm text-destructive">{actionError}</p>}\n      {pendingRequests.length === 0 ? (
+      {actionError && <p className="mb-3 text-sm text-destructive">{actionError}</p>}
+      {pendingRequests.length === 0 ? (
         <EmptyState
           icon={CheckCircle2}
           title="All caught up"
@@ -296,7 +298,9 @@ export default function MovementsPage() {
     return { out, returned, overdue };
   }, [records]);
 
-  const visibleRecords = status === "overdue" ? records.filter(r => ["approved", "out"].includes(r.status) && r.expectedReturn && new Date(r.expectedReturn) < new Date()) : records;\n\n  const markReturned = async (record) => {
+  const visibleRecords = status === "overdue" ? records.filter(r => ["approved", "out"].includes(r.status) && r.expectedReturn && new Date(r.expectedReturn) < new Date()) : records;
+
+  const markReturned = async (record) => {
     await updateMovementRecord(record.id, {
       status: "returned",
       actualReturn: new Date().toISOString(),
@@ -351,7 +355,8 @@ export default function MovementsPage() {
           <SelectContent>
             <SelectItem value={ALL}>All</SelectItem>
             <SelectItem value="out">Out</SelectItem>
-            <SelectItem value="returned">Returned</SelectItem>\n            <SelectItem value="overdue">Overdue return</SelectItem>
+            <SelectItem value="returned">Returned</SelectItem>
+            <SelectItem value="overdue">Overdue return</SelectItem>
           </SelectContent>
         </Select>
       </div>
