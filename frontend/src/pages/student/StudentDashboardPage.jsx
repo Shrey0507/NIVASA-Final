@@ -89,7 +89,7 @@ export default function StudentDashboardPage() {
           <div><dt className="text-muted-foreground">Name</dt><dd className="font-medium">{s.full_name || s.fullName || "—"}</dd></div>
           <div><dt className="text-muted-foreground">USN</dt><dd className="font-medium">{s.usn || "—"}</dd></div>
           <div><dt className="text-muted-foreground">Department</dt><dd className="font-medium">{s.department || "—"}</dd></div>
-          <div><dt className="text-muted-foreground">Room</dt><dd className="font-medium">{s.room_number || s.room || "Unassigned"}</dd></div>
+          <div><dt className="text-muted-foreground">Room</dt><dd className="font-medium">{s.rooms?.room_number || s.room_number || s.room || "Unassigned"}</dd></div>
         </dl>
       </SectionCard>
       <SectionCard title={`Today's mess menu · ${indiaDay}`} action={<Button variant="ghost" size="sm" asChild><Link to="/student/mess">Full menu <ArrowRight /></Link></Button>}>
