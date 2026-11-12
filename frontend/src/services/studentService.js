@@ -12,3 +12,7 @@ export async function cancelMyMovement(id) { return apiRequest(`/movements/${id}
 export async function getMyNotices() { return (await apiRequest("/notices?limit=100")).data?.map(mapNotice) || []; }
 export async function getMyMess() { return (await apiRequest("/mess?limit=100")).data || []; }
 export function summarizeFees(records) { const totalBilled = records.reduce((sum, r) => sum + Number(r.amount || 0), 0); const totalPaid = records.reduce((sum, r) => sum + Number(r.paid || 0), 0); const outstanding = Math.max(0, totalBilled - totalPaid); const nextDueDate = records.filter((r) => Number(r.balance || 0) > 0 && r.dueDate).sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate))[0]?.dueDate || null; return { totalBilled, totalPaid, outstanding, nextDueDate }; }
+
+export async function submitMealFeedback(payload) {
+ return (await apiRequest("/mess/feedback", {method:"POST",body:JSON.stringify(payload)})).data;
+}
