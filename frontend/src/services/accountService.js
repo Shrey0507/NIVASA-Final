@@ -70,6 +70,7 @@ export const createAdminAccount = async (payload) => {
       full_name: payload.full_name,
       email: payload.email,
       role,
+      password: payload.password,
     }),
   })).account;
 };
