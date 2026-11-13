@@ -6,7 +6,7 @@ import { useAuth, ADMIN_ROLES } from "@/hooks/useAuth";
 
 export default function AdminLayout() {
   const navigate = useNavigate();
-  const { user, role, logout, loading, isAuthenticated, isAdmin } = useAuth();
+  const { user, profile, role, logout, loading, isAuthenticated, isAdmin } = useAuth();
 
   useEffect(() => {
     if (!loading && (!isAuthenticated || !isAdmin)) {
@@ -22,6 +22,7 @@ export default function AdminLayout() {
       nav={adminNav}
       subtitle="Admin Console"
       user={user || "Administrator"}
+      profile={profile}
       role={ADMIN_ROLES[role]?.label ?? "Administrator"}
       onLogout={async () => {
         await logout();
