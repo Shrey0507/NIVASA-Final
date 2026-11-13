@@ -10,7 +10,7 @@ const router = Router();
  */
 router.get("/", async (req, res, next) => {
   try {
-    const { student_id, status, fee_type, limit = 50 } = req.query;
+    const { student_id, status, limit = 50 } = req.query;
     let query = req.supabaseAdmin
       .from("fees")
       .select("*, students(full_name, usn)")
@@ -36,8 +36,8 @@ router.get("/", async (req, res, next) => {
       if (student_id) query = query.eq("student_id", student_id);
     }
 
+    query = query.eq("fee_type", "Hostel Fee");
     if (status) query = query.eq("status", status);
-    if (fee_type) query = query.eq("fee_type", fee_type);
 
     const { data, error } = await query;
     if (error) throw error;
@@ -50,9 +50,28 @@ router.get("/", async (req, res, next) => {
 /** POST /api/fees — admin only */
 router.post("/", requireAdmin, async (req, res, next) => {
   try {
+    const studentId = String(req.body?.student_id || "");
+    const amount = Number(req.body?.amount);
+    if (!studentId || !Number.isFinite(amount) || amount <= 0) {
+      return res.status(400).json({ error: { message: "Select an existing student and enter a valid hostel fee amount." } });
+    }
+    const { data: student, error: studentError } = await req.supabaseAdmin
+      .from("students").select("id, hostel").eq("id", studentId).maybeSingle();
+    if (studentError) throw studentError;
+    if (!student) return res.status(404).json({ error: { message: "The selected student does not exist." } });
+    if (req.hostelScope && student.hostel !== req.hostelScope) return res.status(403).json({ error: { message: "You cannot add fees for students in another hostel." } });
+    const feePayload = {
+      student_id: student.id,
+      amount,
+      paid_amount: 0,
+      fee_type: "Hostel Fee",
+      due_date: req.body.due_date || null,
+      term: req.body.term || null,
+      status: "pending",
+    };
     const { data, error } = await req.supabaseAdmin
       .from("fees")
-      .insert(req.body)
+      .insert(feePayload)
       .select()
       .single();
     if (error) throw error;
