@@ -113,13 +113,16 @@ router.post("/students", async (req, res, next) => {
 
     const admin = req.supabaseAdmin;
     const normalizedEmail = String(email).trim().toLowerCase();
-    const normalizedUsn = String(usn).trim().toUpperCase();
+    const normalizedUsn = String(usn ?? "").trim().toUpperCase();
+    if (!/^[A-Z0-9][A-Z0-9/-]{2,29}$/.test(normalizedUsn)) {
+      return res.status(400).json({ error: { message: "A valid USN is required (3–30 letters/numbers; hyphens and slashes are allowed)." } });
+    }
 
     const { data: existingStudent, error: lookupError } = await admin
       .from("students").select("id").ilike("usn", normalizedUsn).maybeSingle();
     if (lookupError) throw lookupError;
     if (existingStudent) {
-      return res.status(409).json({ error: { message: "A student with this ID / USN already exists." } });
+      return res.status(409).json({ error: { message: "This USN is already registered. Each student must have a unique USN." } });
     }
 
     const { data: authResult, error: authError } = await admin.auth.admin.createUser({
