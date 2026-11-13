@@ -114,7 +114,7 @@ export default function RoomsPage() {
         setAllocationError("");
         const [assignments, students] = await Promise.all([
           getRoomAllocations(selectedRoom.id),
-          getStudents({ hostel: selectedRoom.hostel, limit: 1000 }),
+          getStudents({ hostel: selectedRoom.hostel, limit: 1000, unassigned: "true", search: studentSearch.trim() }),
         ]);
         if (cancelled) return;
         setRoomAllocations(assignments);
@@ -128,7 +128,7 @@ export default function RoomsPage() {
       }
     })();
     return () => { cancelled = true; };
-  }, [selectedRoom?.id, selectedRoom?.hostel]);
+  }, [selectedRoom?.id, selectedRoom?.hostel, studentSearch]);
 
   const summary = useMemo(() => {
     const total = rooms.length;
@@ -238,7 +238,7 @@ export default function RoomsPage() {
       setAllocationLoading(true);
       const [assignments, students] = await Promise.all([
         getRoomAllocations(selectedRoom.id),
-        getStudents({ hostel: selectedRoom.hostel, limit: 200 }),
+        getStudents({ hostel: selectedRoom.hostel, limit: 1000, unassigned: "true", search: studentSearch.trim() }),
       ]);
       setRoomAllocations(assignments);
       setEligibleStudents((students || []).filter((student) =>
