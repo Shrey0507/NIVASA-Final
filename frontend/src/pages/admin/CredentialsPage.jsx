@@ -75,7 +75,17 @@ export default function CredentialsPage() {
     }
   };
 
-  const setPasswordForAccount = async (account) => {\n    const password = window.prompt(`Set a new password for ${account.full_name || account.email}. Use at least 8 characters.`);\n    if (password === null) return;\n    if (password.length < 8) { setError("Password must be at least 8 characters."); return; }\n    setBusyId(account.id); setError(""); setMessage("");\n    try { await setAdminPassword(account.id, password); setMessage(`Password updated for ${account.full_name || account.email}.`); }\n    catch (e) { setError(e.message || "Could not update administrator password."); }\n    finally { setBusyId(""); }\n  };\n\n  const permanentlyRemoveAccount = async (account) => {
+  const setPasswordForAccount = async (account) => {
+    const password = window.prompt(`Set a new password for ${account.full_name || account.email}. Use at least 8 characters.`);
+    if (password === null) return;
+    if (password.length < 8) { setError("Password must be at least 8 characters."); return; }
+    setBusyId(account.id); setError(""); setMessage("");
+    try { await setAdminPassword(account.id, password); setMessage(`Password updated for ${account.full_name || account.email}.`); }
+    catch (e) { setError(e.message || "Could not update administrator password."); }
+    finally { setBusyId(""); }
+  };
+
+  const permanentlyRemoveAccount = async (account) => {
     const confirmation = window.prompt(
       `Delete ${account.full_name || account.email} permanently? This cannot be undone. Type DELETE to confirm.`
     );
@@ -130,7 +140,8 @@ export default function CredentialsPage() {
               {mode === "admin" && role === "super" && <option value="all">All hostels</option>}
             </select>
           </div>
-          {mode === "admin" && <div><Label>Initial password</Label><Input required type="password" minLength={8} autoComplete="new-password" value={form.password} onChange={(e) => updateForm("password", e.target.value)} placeholder="At least 8 characters" /></div>}\n          {mode === "student" && <>
+          {mode === "admin" && <div><Label>Initial password</Label><Input required type="password" minLength={8} autoComplete="new-password" value={form.password} onChange={(e) => updateForm("password", e.target.value)} placeholder="At least 8 characters" /></div>}
+          {mode === "student" && <>
             <div><Label>Student ID / USN</Label><Input required value={form.usn} onChange={(e) => updateForm("usn", e.target.value.toUpperCase())} /></div>
             <div><Label>Initial password</Label><Input required type="password" minLength={8} autoComplete="new-password" value={form.password} onChange={(e) => updateForm("password", e.target.value)} placeholder="At least 8 characters" /></div>
             <div className="grid grid-cols-2 gap-2">
@@ -188,7 +199,8 @@ export default function CredentialsPage() {
                 <div className="flex justify-center"><Badge variant="outline" className="text-[11px]">{account.role}</Badge></div>
                 <div className="flex justify-center"><Badge variant={account.status === "active" ? "secondary" : "destructive"} className="text-[11px]">{account.status}</Badge></div>
                 <div className="flex items-center justify-end">
-                  {role === "super" && ["boys_admin", "girls_admin", "super_admin"].includes(account.role) && account.id !== userId && <Button size="sm" variant="outline" className="h-8 px-2 text-xs" disabled={busyId === account.id} onClick={() => setPasswordForAccount(account)} title="Set administrator password"><KeyRound className="mr-1 h-3.5 w-3.5" />Set password</Button>}\n                  {role === "super" && account.id !== userId && <Button size="sm" variant="ghost" className="h-8 px-2 text-xs text-destructive hover:text-destructive" disabled={busyId === account.id} onClick={() => permanentlyRemoveAccount(account)} title="Permanently delete account"><Trash2 className="h-3.5 w-3.5" />{busyId === account.id ? "Deleting…" : "Delete"}</Button>}
+                  {role === "super" && ["boys_admin", "girls_admin", "super_admin"].includes(account.role) && account.id !== userId && <Button size="sm" variant="outline" className="h-8 px-2 text-xs" disabled={busyId === account.id} onClick={() => setPasswordForAccount(account)} title="Set administrator password"><KeyRound className="mr-1 h-3.5 w-3.5" />Set password</Button>}
+                  {role === "super" && account.id !== userId && <Button size="sm" variant="ghost" className="h-8 px-2 text-xs text-destructive hover:text-destructive" disabled={busyId === account.id} onClick={() => permanentlyRemoveAccount(account)} title="Permanently delete account"><Trash2 className="h-3.5 w-3.5" />{busyId === account.id ? "Deleting…" : "Delete"}</Button>}
                 </div>
               </div>)}
             </div>
