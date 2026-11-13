@@ -20,7 +20,11 @@ router.get("/", async (req, res, next) => {
     if (hostel) query = query.eq("hostel", hostel);
     if (department) query = query.eq("department", department);
     if (year) query = query.eq("year", year);
-    if (unassigned === "true") query = query.is("room_id", null);\n    if (search) {\n      const term = String(search).trim().replace(/[,%()]/g, " ");\n      if (term) query = query.or(`full_name.ilike.%${term}%,usn.ilike.%${term}%,email.ilike.%${term}%`);\n    }
+    if (unassigned === "true") query = query.is("room_id", null);
+    if (search) {
+      const term = String(search).trim().replace(/[,%()]/g, " ");
+      if (term) query = query.or(`full_name.ilike.%${term}%,usn.ilike.%${term}%,email.ilike.%${term}%`);
+    }
 
     const { data, error } = await query;
     if (error) throw error;
