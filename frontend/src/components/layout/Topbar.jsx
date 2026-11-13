@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/sheet";
 import { AppSidebar } from "./AppSidebar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 export function Topbar({
   title,
@@ -30,6 +31,7 @@ export function Topbar({
   const [notifications, setNotifications] = useState([]);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [notificationsError, setNotificationsError] = useState("");
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
 
   useEffect(() => {
     if (!showNotifications || !notificationsOpen) return;
@@ -134,9 +136,30 @@ export function Topbar({
               {profile?.phone && <div className="flex justify-between gap-3"><span className="text-muted-foreground">Phone</span><span className="font-medium">{profile.phone}</span></div>}
               {!profile?.usn && !profile?.department && !profile?.hostel && !profile?.phone && <p className="text-center text-muted-foreground">Your account details are shown here.</p>}
             </div>
-            <div className="border-t p-2"><Button variant="ghost" className="w-full justify-start text-sm" onClick={onLogout}><LogOut className="mr-2 size-4" />Sign out</Button></div>
+            <div className="border-t p-2">
+    <Button variant="ghost" className="w-full justify-start text-sm text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setLogoutConfirmOpen(true)}>
+      <LogOut className="mr-2 size-4" />Sign out
+    </Button>
+  </div>
           </PopoverContent>
         </Popover>
+        <Dialog open={logoutConfirmOpen} onOpenChange={setLogoutConfirmOpen}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <div className="mb-2 flex size-11 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+                <LogOut className="size-5" />
+              </div>
+              <DialogTitle>Sign out of NIVASA?</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to sign out? You will need to log in again to access your hostel dashboard.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="gap-2 sm:gap-2">
+              <Button variant="outline" onClick={() => setLogoutConfirmOpen(false)}>Cancel</Button>
+              <Button variant="destructive" onClick={() => { setLogoutConfirmOpen(false); onLogout?.(); }}>Yes, sign out</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </header>
   );
