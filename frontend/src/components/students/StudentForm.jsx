@@ -61,7 +61,9 @@ export default function StudentForm({ open, student, onClose }) {
   const validate = () => {
     const next = {};
     if (!form.fullName.trim()) next.fullName = "Full name is required";
-    if (!form.usn.trim()) next.usn = "USN is required";
+    const normalizedUsn = form.usn.trim().toUpperCase();
+    if (!normalizedUsn) next.usn = "USN is required";
+    else if (!/^[A-Z0-9][A-Z0-9/-]{2,29}$/.test(normalizedUsn)) next.usn = "Enter a valid USN (3–30 letters/numbers; hyphens and slashes are allowed)";
     if (!form.department) next.department = "Department is required";
     if (!form.phone.trim()) next.phone = "Phone number is required";
     else if (!/^[0-9]{10}$/.test(form.phone))
@@ -87,8 +89,9 @@ export default function StudentForm({ open, student, onClose }) {
     if (!validate()) return;
     try {
       setSubmitting(true);
-      if (student) await updateStudent(student.id, form);
-      else await createStudent(form);
+      const payload = { ...form, usn: form.usn.trim().toUpperCase() };
+      if (student) await updateStudent(student.id, payload);
+      else await createStudent(payload);
       onClose(true);
     } catch (err) {
       setErrors({ form: err.message });
@@ -122,7 +125,7 @@ export default function StudentForm({ open, student, onClose }) {
               <Input
                 value={form.usn}
                 onChange={(e) => update("usn", e.target.value.toUpperCase())}
-                placeholder="1MS22CS001"
+                placeholder="1JB24CS200" required maxLength={30} autoCapitalize="characters"
               />
             </Field>
           </div>
