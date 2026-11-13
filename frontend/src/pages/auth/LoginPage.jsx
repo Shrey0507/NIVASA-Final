@@ -3,7 +3,6 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { ArrowRight, Eye, EyeOff, Lock, Mail, Shield, GraduationCap } from "lucide-react";
 import { AuthLayout } from "@/components/layout/AuthLayout";
 import { useAuth } from "@/hooks/useAuth";
-import supabase from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -100,17 +99,9 @@ export default function LoginPage({ initialMode }) {
     }
   };
 
-  const reset = async () => {
+  const reset = () => {
     setError("");
-    setMessage("");
-    if (!form.identifier.includes("@"))
-      return setError("Enter your registered email to request a reset link.");
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(
-      form.identifier,
-      { redirectTo: `${window.location.origin}/login` }
-    );
-    if (resetError) setError("Unable to send a reset email.");
-    else setMessage("If the account exists, a password reset email has been sent.");
+    setMessage("Password resets are handled by your hostel administrator. Please contact the admin office to request a password change.");
   };
 
   // Don't render login form while checking existing session
@@ -231,7 +222,7 @@ export default function LoginPage({ initialMode }) {
           className="w-full text-sm text-violet-300 hover:underline"
           onClick={reset}
         >
-          Forgot password?
+          Forgot password? Contact admin
         </button>
       </form>
 
