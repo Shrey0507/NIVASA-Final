@@ -727,19 +727,41 @@ export default function RoomsPage() {
                     ) : <p className="text-sm text-muted-foreground">No students assigned to this room yet.</p>}
                   <div className="space-y-2 border-t pt-3">
                     <h4 className="text-sm font-semibold">Assign a student</h4>
-                    <Input value={studentSearch} onChange={(event) => setStudentSearch(event.target.value)} placeholder="Search all students by name, USN or email" />
-                    <Select value={selectedStudentId} onValueChange={setSelectedStudentId}>
-                      <SelectTrigger><SelectValue placeholder={filteredEligibleStudents.length ? "Choose a student" : "No students found"} /></SelectTrigger>
-                      <SelectContent>
-                        {filteredEligibleStudents.map((student) => {
-                          const alreadyAssigned = Boolean(student.roomId || student.room_id);
-                          const inactive = student.status !== "active";
-                          return <SelectItem key={student.id} value={student.id} disabled={alreadyAssigned || inactive}>
-                            {(student.fullName || student.full_name || "Unnamed")} · {student.usn || student.email || "No USN"}{alreadyAssigned ? " · Already assigned" : inactive ? " · Inactive" : ""}
-                          </SelectItem>;
-                        })}
-                      </SelectContent>
-                    </Select>
+                    <div className="relative">
+                      <Input
+                        value={studentSearch}
+                        onChange={(event) => { setStudentSearch(event.target.value); setSelectedStudentId(""); }}
+                        placeholder="Search all students by name, USN or email"
+                        autoComplete="off"
+                      />
+                      {studentSearch.trim() && (
+                        <div className="absolute z-50 mt-1 max-h-56 w-full overflow-y-auto rounded-lg border bg-popover p-1 shadow-lg">
+                          {filteredEligibleStudents.length ? filteredEligibleStudents.map((student) => {
+                            const alreadyAssigned = Boolean(student.roomId || student.room_id);
+                            const inactive = student.status !== "active";
+                            const assignedRoom = student.rooms?.room_number || student.room || student.room_number;
+                            return (
+                              <button
+                                key={student.id}
+                                type="button"
+                                disabled={alreadyAssigned || inactive}
+                                onClick={() => { setSelectedStudentId(student.id); setStudentSearch(student.fullName || student.full_name || student.usn || ""); }}
+                                className="flex w-full items-center justify-between gap-3 rounded-md px-3 py-2 text-left text-sm hover:bg-accent disabled:cursor-not-allowed disabled:opacity-100"
+                              >
+                                <span className="min-w-0">
+                                  <span className="block truncate font-medium">{student.fullName || student.full_name || "Unnamed"}</span>
+                                  <span className="block truncate text-xs text-muted-foreground">{student.usn || student.email || "No USN"}{alreadyAssigned && assignedRoom ? ` · Room ${assignedRoom}` : ""}</span>
+                                </span>
+                                <span className={alreadyAssigned ? "shrink-0 rounded-full bg-emerald-500/15 px-2 py-1 text-xs font-medium text-emerald-600" : inactive ? "shrink-0 rounded-full bg-muted px-2 py-1 text-xs font-medium text-muted-foreground" : "shrink-0 rounded-full bg-red-500/15 px-2 py-1 text-xs font-medium text-red-600"}>
+                                  {alreadyAssigned ? "✓ Assigned" : inactive ? "Inactive" : "● Unassigned"}
+                                </span>
+                              </button>
+                            );
+                          }) : <p className="px-3 py-4 text-center text-sm text-muted-foreground">No students match this search.</p>}
+                        </div>
+                      )}
+                    </div>
+                    {selectedStudentId && <p className="text-xs text-emerald-600">Student selected and ready for room assignment.</p>}
                     <Button className="w-full" onClick={handleAssignStudent} disabled={!selectedStudentId || allocationSaving || allocationLoading || roomAllocations.length >= Number(selectedRoom.capacity)}>
                       <UserPlus className="mr-2 h-4 w-4" />{allocationSaving ? "Saving..." : "Assign student"}
                     </Button>
