@@ -114,13 +114,11 @@ export default function RoomsPage() {
         setAllocationError("");
         const [assignments, students] = await Promise.all([
           getRoomAllocations(selectedRoom.id),
-          getStudents({ hostel: selectedRoom.hostel, limit: 1000, unassigned: "true", search: studentSearch.trim() }),
+          getStudents({ hostel: selectedRoom.hostel, limit: 1000, search: studentSearch.trim() }),
         ]);
         if (cancelled) return;
         setRoomAllocations(assignments);
-        setEligibleStudents((students || []).filter((student) =>
-          student.status === "active" && !student.roomId && !student.room_id
-        ));
+        setEligibleStudents(students || []);
       } catch (err) {
         if (!cancelled) setAllocationError(err.message || "Unable to load room assignments.");
       } finally {
@@ -238,12 +236,10 @@ export default function RoomsPage() {
       setAllocationLoading(true);
       const [assignments, students] = await Promise.all([
         getRoomAllocations(selectedRoom.id),
-        getStudents({ hostel: selectedRoom.hostel, limit: 1000, unassigned: "true", search: studentSearch.trim() }),
+        getStudents({ hostel: selectedRoom.hostel, limit: 1000, search: studentSearch.trim() }),
       ]);
       setRoomAllocations(assignments);
-      setEligibleStudents((students || []).filter((student) =>
-        student.status === "active" && !student.roomId && !student.room_id
-      ));
+      setEligibleStudents(students || []);
       await load();
     } catch (err) {
       setAllocationError(err.message || "Unable to refresh assignments.");
@@ -731,13 +727,17 @@ export default function RoomsPage() {
                     ) : <p className="text-sm text-muted-foreground">No students assigned to this room yet.</p>}
                   <div className="space-y-2 border-t pt-3">
                     <h4 className="text-sm font-semibold">Assign a student</h4>
-                    <Input value={studentSearch} onChange={(event) => setStudentSearch(event.target.value)} placeholder="Search eligible students by name, USN or email" />
+                    <Input value={studentSearch} onChange={(event) => setStudentSearch(event.target.value)} placeholder="Search all students by name, USN or email" />
                     <Select value={selectedStudentId} onValueChange={setSelectedStudentId}>
-                      <SelectTrigger><SelectValue placeholder={filteredEligibleStudents.length ? "Choose an unassigned student" : "No eligible students"} /></SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder={filteredEligibleStudents.length ? "Choose a student" : "No students found"} /></SelectTrigger>
                       <SelectContent>
-                        {filteredEligibleStudents.map((student) => <SelectItem key={student.id} value={student.id}>
-                          {(student.fullName || student.full_name || "Unnamed")} · {student.usn || student.email || "No USN"}
-                        </SelectItem>)}
+                        {filteredEligibleStudents.map((student) => {
+                          const alreadyAssigned = Boolean(student.roomId || student.room_id);
+                          const inactive = student.status !== "active";
+                          return <SelectItem key={student.id} value={student.id} disabled={alreadyAssigned || inactive}>
+                            {(student.fullName || student.full_name || "Unnamed")} · {student.usn || student.email || "No USN"}{alreadyAssigned ? " · Already assigned" : inactive ? " · Inactive" : ""}
+                          </SelectItem>;
+                        })}
                       </SelectContent>
                     </Select>
                     <Button className="w-full" onClick={handleAssignStudent} disabled={!selectedStudentId || allocationSaving || allocationLoading || roomAllocations.length >= Number(selectedRoom.capacity)}>
