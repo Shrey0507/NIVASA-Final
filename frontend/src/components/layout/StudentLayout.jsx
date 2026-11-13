@@ -24,6 +24,7 @@ export default function StudentLayout() {
       nav={studentNav}
       subtitle="Student Portal"
       user={user || record.full_name || "Student"}
+      profile={{ ...profile, ...record }}
       role={`${record.department || "Student"} · ${record.year || ""}`}
       showNotifications
       onLogout={async () => {
