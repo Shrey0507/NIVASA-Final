@@ -82,3 +82,4 @@ export const deactivateAccount = async (id) =>
 
 export const permanentlyDeleteAccount = async (id) =>
   apiRequest(`/accounts/${encodeURIComponent(id)}`, { method: "DELETE" });
+\nexport const setAdminPassword = async (id, password) =>\n  apiRequest(`/accounts/${encodeURIComponent(id)}/password`, { method: "PATCH", body: JSON.stringify({ password }) });\n
