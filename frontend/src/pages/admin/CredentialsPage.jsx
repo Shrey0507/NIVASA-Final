@@ -127,27 +127,6 @@ export default function CredentialsPage() {
     }
   };
 
-  const permanentlyRemoveAccount = async (account) => {
-    const confirmation = window.prompt(
-      `Delete ${account.full_name || account.email} permanently? This cannot be undone. Type DELETE to confirm.`
-    );
-    if (confirmation !== "DELETE") return;
-
-    setBusyId(account.id);
-    setError("");
-    setMessage("");
-    try {
-      await permanentlyDeleteAccount(account.id);
-      setMessage(`${account.full_name || account.email} was permanently deleted.`);
-      // Move back if deleting the only row on this page.
-      if (accounts.length === 1 && page > 1) setPage((current) => current - 1);
-      else await load();
-    } catch (e) {
-      setError(e.message || "Could not permanently delete account.");
-    } finally {
-      setBusyId("");
-    }
-  };
 
   const applySearch = (e) => {
     e.preventDefault();
