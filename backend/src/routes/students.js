@@ -1,6 +1,9 @@
 import { Router } from "express";
 const router = Router();
 
+const normalizeUsn = (value) => String(value ?? "").trim().toUpperCase();
+const validUsn = (value) => /^[A-Z0-9][A-Z0-9/-]{2,29}$/.test(value);
+
 /**
  * GET /api/students
  *
@@ -69,6 +72,8 @@ router.get("/:id", async (req, res, next) => {
 router.post("/", async (req, res, next) => {
   try {
     const body = { ...req.body };
+    body.usn = normalizeUsn(body.usn);
+    if (!validUsn(body.usn)) return res.status(400).json({ error: { message: "A valid USN is required (3–30 letters/numbers; hyphens and slashes are allowed)." } });
 
     // Enforce hostel scope for non-super admins
     if (req.hostelScope) {
@@ -147,12 +152,18 @@ router.patch("/:id", async (req, res, next) => {
       }
     }
 
+    const updates = { ...req.body };
+    if (Object.prototype.hasOwnProperty.call(updates, "usn")) {
+      updates.usn = normalizeUsn(updates.usn);
+      if (!validUsn(updates.usn)) return res.status(400).json({ error: { message: "A valid USN is required (3–30 letters/numbers; hyphens and slashes are allowed)." } });
+    }
     const { data, error } = await req.supabaseAdmin
       .from("students")
-      .update(req.body)
+      .update(updates)
       .eq("id", req.params.id)
       .select()
       .single();
+    if (error?.code === "23505") return res.status(409).json({ error: { message: "This USN is already registered. Each student must have a unique USN." } });
     if (error) throw error;
     res.json({ data });
   } catch (err) {
