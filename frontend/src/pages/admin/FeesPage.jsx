@@ -5,6 +5,7 @@ import {
   createFeeRecord,
   getFeeRecords,
   updateFeeRecord,
+  getStudents,
 } from "@/services/adminService";
 import { PageHeader } from "@/components/common/PageHeader";
 import { StatCard } from "@/components/common/StatCard";
@@ -13,7 +14,6 @@ import { EmptyState } from "@/components/common/EmptyState";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
   DialogContent,
@@ -56,8 +56,7 @@ export default function FeesPage() {
   const [error, setError] = useState(null);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState(ALL);
-  const [category, setCategory] = useState(ALL);
-  const [paymentTarget, setPaymentTarget] = useState(null);
+    const [paymentTarget, setPaymentTarget] = useState(null);
   const [showAdd, setShowAdd] = useState(false);
 
   const load = useCallback(async () => {
@@ -67,7 +66,6 @@ export default function FeesPage() {
       const data = await getFeeRecords({
         search,
         status: status === ALL ? "" : status,
-        category: category === ALL ? "" : category,
       });
       setRecords(data);
     } catch (err) {
@@ -75,7 +73,7 @@ export default function FeesPage() {
     } finally {
       setLoading(false);
     }
-  }, [search, status, category]);
+  }, [search, status]);
 
   useEffect(() => {
     load();
@@ -140,26 +138,12 @@ export default function FeesPage() {
             <SelectItem value="overdue">Overdue</SelectItem>
           </SelectContent>
         </Select>
-        <Select value={category} onValueChange={setCategory}>
-          <SelectTrigger className="sm:w-[180px]">
-            <SelectValue placeholder="Category" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL}>All categories</SelectItem>
-            <SelectItem value="Semester Fee">Semester Fee</SelectItem>
-            <SelectItem value="Hostel Fee">Hostel Fee</SelectItem>
-            <SelectItem value="Mess Fee">Mess Fee</SelectItem>
-          </SelectContent>
-        </Select>
+
       </div>
 
       <div className="rounded-xl border bg-card">
         {loading ? (
-          <div className="space-y-2 p-4">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <Skeleton key={i} className="h-12 w-full" />
-            ))}
-          </div>
+          <div className="p-6 text-center text-sm text-muted-foreground">Loading fee records…</div>
         ) : error ? (
           <div className="p-6">
             <EmptyState
@@ -185,7 +169,7 @@ export default function FeesPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Student</TableHead>
-                <TableHead>Category</TableHead>
+                <TableHead>Fee type</TableHead>
                 <TableHead className="text-right">Amount</TableHead>
                 <TableHead className="text-right">Paid</TableHead>
                 <TableHead className="text-right">Balance</TableHead>
@@ -204,7 +188,7 @@ export default function FeesPage() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <div>{r.category}</div>
+                    <div>Hostel Fee</div>
                     <div className="text-xs text-muted-foreground">
                       {r.term}
                     </div>
@@ -340,55 +324,62 @@ function PaymentDialog({ record, onClose }) {
 }
 
 function AddFeeDialog({ open, onClose }) {
-  const [form, setForm] = useState({
-    studentName: "",
-    usn: "",
-    category: "Semester Fee",
-    term: "",
-    amount: "",
-    dueDate: "",
-  });
+  const [students, setStudents] = useState([]);
+  const [studentsLoading, setStudentsLoading] = useState(false);
+  const [studentSearch, setStudentSearch] = useState("");
+  const [selectedStudent, setSelectedStudent] = useState(null);
+  const [showResults, setShowResults] = useState(false);
+  const [form, setForm] = useState({ term: "", amount: "", dueDate: "" });
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (open) {
-      setForm({
-        studentName: "",
-        usn: "",
-        category: "Semester Fee",
-        term: "",
-        amount: "",
-        dueDate: "",
-      });
-      setError("");
-    }
+    if (!open) return;
+    setStudents([]);
+    setStudentsLoading(true);
+    setStudentSearch("");
+    setSelectedStudent(null);
+    setForm({ term: "", amount: "", dueDate: "" });
+    setError("");
+    getStudents({ limit: 1000 })
+      .then(setStudents)
+      .catch((err) => setError(err.message || "Could not load students."))
+      .finally(() => setStudentsLoading(false));
   }, [open]);
 
-  const update = (k, v) => setForm((p) => ({ ...p, [k]: v }));
+  const matches = students.filter((student) => {
+    const term = studentSearch.trim().toLowerCase();
+    if (!term) return false;
+    return [student.fullName, student.usn, student.email]
+      .some((value) => String(value || "").toLowerCase().includes(term));
+  }).slice(0, 10);
 
   const handleSave = async () => {
-    if (!form.studentName.trim() || !form.usn.trim()) {
-      setError("Student name and USN are required");
+    if (!selectedStudent) {
+      setError("Select an existing student first.");
       return;
     }
     const amount = Number(form.amount);
-    if (!amount || amount <= 0) {
-      setError("Enter a valid amount");
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setError("Enter a valid hostel fee amount.");
+      return;
+    }
+    if (!form.dueDate) {
+      setError("Choose a due date.");
       return;
     }
     try {
       setSaving(true);
+      setError("");
       await createFeeRecord({
-        ...form,
+        studentId: selectedStudent.id,
         amount,
-        studentId: Date.now(),
-        paid: 0,
-        dueDate: form.dueDate || new Date().toISOString().split("T")[0],
+        category: "Hostel Fee",
+        dueDate: form.dueDate,
       });
       onClose(true);
     } catch (err) {
-      setError(err.message);
+      setError(err.message || "Could not add hostel fee record.");
     } finally {
       setSaving(false);
     }
@@ -398,78 +389,86 @@ function AddFeeDialog({ open, onClose }) {
     <Dialog open={open} onOpenChange={(v) => !v && onClose(false)}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Add fee record</DialogTitle>
+          <DialogTitle>Add hostel fee record</DialogTitle>
           <DialogDescription>
-            Create a new billed fee entry for a resident.
+            Select an existing resident first, then enter the hostel fee details.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-4">
           <div className="space-y-2">
-            <Label>Student name</Label>
-            <Input
-              value={form.studentName}
-              onChange={(e) => update("studentName", e.target.value)}
-            />
+            <Label>Find student</Label>
+            {selectedStudent ? (
+              <div className="flex items-center justify-between gap-3 rounded-lg border p-3">
+                <div className="min-w-0">
+                  <p className="font-medium">{selectedStudent.fullName}</p>
+                  <p className="text-xs text-muted-foreground">{selectedStudent.usn} · {selectedStudent.email || "No email"}</p>
+                </div>
+                <Button type="button" size="sm" variant="outline" onClick={() => { setSelectedStudent(null); setStudentSearch(""); }}>
+                  Change
+                </Button>
+              </div>
+            ) : (
+              <div className="relative">
+                <Input
+                  value={studentSearch}
+                  onChange={(event) => { setStudentSearch(event.target.value); setShowResults(true); }}
+                  onFocus={() => setShowResults(true)}
+                  placeholder="Search existing students by name, USN or email"
+                  autoComplete="off"
+                />
+                {showResults && studentSearch.trim() && (
+                  <div className="absolute z-50 mt-1 max-h-56 w-full overflow-y-auto rounded-lg border bg-popover p-1 shadow-lg">
+                    {studentsLoading ? (
+                      <p className="px-3 py-3 text-sm text-muted-foreground">Loading students…</p>
+                    ) : matches.length ? matches.map((student) => (
+                      <button key={student.id} type="button"
+                        className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm hover:bg-accent"
+                        onClick={() => { setSelectedStudent(student); setStudentSearch(""); setShowResults(false); setError(""); }}>
+                        <span className="min-w-0">
+                          <span className="block truncate font-medium">{student.fullName || "Unnamed student"}</span>
+                          <span className="block truncate text-xs text-muted-foreground">{student.usn} · {student.email || "No email"}</span>
+                        </span>
+                        <span className="ml-3 shrink-0 text-xs text-muted-foreground">{student.hostelType === "girls" ? "Girls' hostel" : "Boys' hostel"}</span>
+                      </button>
+                    )) : (
+                      <p className="px-3 py-3 text-sm text-muted-foreground">No matching existing students.</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
-          <div className="space-y-2">
-            <Label>USN</Label>
-            <Input
-              value={form.usn}
-              onChange={(e) => update("usn", e.target.value.toUpperCase())}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Category</Label>
-            <Select
-              value={form.category}
-              onValueChange={(v) => update("category", v)}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Semester Fee">Semester Fee</SelectItem>
-                <SelectItem value="Hostel Fee">Hostel Fee</SelectItem>
-                <SelectItem value="Mess Fee">Mess Fee</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>Term</Label>
-            <Input
-              value={form.term}
-              onChange={(e) => update("term", e.target.value)}
-              placeholder="Semester 5"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Amount</Label>
-            <Input
-              type="number"
-              value={form.amount}
-              onChange={(e) => update("amount", e.target.value)}
-              placeholder="45000"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Due date</Label>
-            <Input
-              type="date"
-              value={form.dueDate}
-              onChange={(e) => update("dueDate", e.target.value)}
-            />
-          </div>
+
+          {selectedStudent && (
+            <>
+              <div className="rounded-lg border p-3 text-sm">
+                <p className="font-medium">Hostel fee</p>
+                <p className="text-muted-foreground">This record will be linked to {selectedStudent.fullName} ({selectedStudent.usn}).</p>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Billing period (optional)</Label>
+                  <Input value={form.term} onChange={(e) => setForm((p) => ({ ...p, term: e.target.value }))} placeholder="e.g. 2026–27" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Amount (₹)</Label>
+                  <Input type="number" min="1" value={form.amount} onChange={(e) => setForm((p) => ({ ...p, amount: e.target.value }))} placeholder="45000" />
+                </div>
+                <div className="space-y-2 sm:col-span-2">
+                  <Label>Due date</Label>
+                  <Input type="date" value={form.dueDate} onChange={(e) => setForm((p) => ({ ...p, dueDate: e.target.value }))} />
+                </div>
+              </div>
+            </>
+          )}
         </div>
 
         {error && <p className="text-sm text-destructive">{error}</p>}
-
         <DialogFooter>
-          <Button variant="outline" onClick={() => onClose(false)} disabled={saving}>
-            Cancel
-          </Button>
-          <Button onClick={handleSave} disabled={saving}>
-            {saving ? "Saving..." : "Add record"}
+          <Button variant="outline" onClick={() => onClose(false)} disabled={saving}>Cancel</Button>
+          <Button onClick={handleSave} disabled={saving || !selectedStudent}>
+            {saving ? "Saving…" : "Add hostel fee"}
           </Button>
         </DialogFooter>
       </DialogContent>
