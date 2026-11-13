@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Search, RefreshCw, Trash2, ChevronLeft, ChevronRight, UserPlus, KeyRound } from "lucide-react";
+import { Search, RefreshCw, Trash2, ChevronLeft, ChevronRight, UserPlus, Pencil, ShieldCheck, Eye, EyeOff } from "lucide-react";
 import { getAccounts, createStudentAccount, createAdminAccount, permanentlyDeleteAccount, setAdminPassword } from "@/services/accountService";
 import { useAuth } from "@/hooks/useAuth";
 import { PageHeader } from "@/components/common/PageHeader";
@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const PAGE_SIZE = 25;
 const EMPTY_FORM = { full_name: "", email: "", username: "", usn: "", password: "", hostel: "boys", phone: "", department: "", year: 1, semester: "", guardian_name: "", guardian_phone: "", address: "" };
@@ -29,6 +30,12 @@ export default function CredentialsPage() {
   const [busyId, setBusyId] = useState("");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [editTarget, setEditTarget] = useState(null);
+  const [editPassword, setEditPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showEditPassword, setShowEditPassword] = useState(false);
+  const [editError, setEditError] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -75,14 +82,49 @@ export default function CredentialsPage() {
     }
   };
 
-  const setPasswordForAccount = async (account) => {
-    const password = window.prompt(`Set a new password for ${account.full_name || account.email}. Use at least 8 characters.`);
-    if (password === null) return;
-    if (password.length < 8) { setError("Password must be at least 8 characters."); return; }
-    setBusyId(account.id); setError(""); setMessage("");
-    try { await setAdminPassword(account.id, password); setMessage(`Password updated for ${account.full_name || account.email}.`); }
-    catch (e) { setError(e.message || "Could not update administrator password."); }
-    finally { setBusyId(""); }
+  const openAccountEditor = (account) => {
+    setEditTarget(account);
+    setEditPassword("");
+    setConfirmPassword("");
+    setEditError("");
+    setShowEditPassword(false);
+  };
+
+  const saveAccountPassword = async (event) => {
+    event.preventDefault();
+    if (editPassword.length < 8) return setEditError("Password must be at least 8 characters.");
+    if (editPassword !== confirmPassword) return setEditError("Passwords do not match.");
+    setEditSaving(true);
+    setEditError("");
+    try {
+      await setAdminPassword(editTarget.id, editPassword);
+      setMessage(`Password updated for ${editTarget.full_name || editTarget.email}.`);
+      setEditTarget(null);
+    } catch (e) {
+      setEditError(e.message || "Could not update password.");
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  const deleteFromEditor = async () => {
+    if (!editTarget) return;
+    const account = editTarget;
+    const confirmation = window.prompt(`Permanently delete ${account.full_name || account.email}? Type DELETE to confirm.`);
+    if (confirmation !== "DELETE") return;
+    setBusyId(account.id);
+    setEditError("");
+    try {
+      await permanentlyDeleteAccount(account.id);
+      setMessage(`${account.full_name || account.email} was permanently deleted.`);
+      setEditTarget(null);
+      if (accounts.length === 1 && page > 1) setPage((current) => current - 1);
+      else await load();
+    } catch (e) {
+      setEditError(e.message || "Could not delete account.");
+    } finally {
+      setBusyId("");
+    }
   };
 
   const permanentlyRemoveAccount = async (account) => {
@@ -199,8 +241,7 @@ export default function CredentialsPage() {
                 <div className="flex justify-center"><Badge variant="outline" className="text-[11px]">{account.role}</Badge></div>
                 <div className="flex justify-center"><Badge variant={account.status === "active" ? "secondary" : "destructive"} className="text-[11px]">{account.status}</Badge></div>
                 <div className="flex items-center justify-end">
-                  {role === "super" && ["boys_admin", "girls_admin", "super_admin"].includes(account.role) && account.id !== userId && <Button size="sm" variant="outline" className="h-8 px-2 text-xs" disabled={busyId === account.id} onClick={() => setPasswordForAccount(account)} title="Set administrator password"><KeyRound className="mr-1 h-3.5 w-3.5" />Set password</Button>}
-                  {role === "super" && account.id !== userId && <Button size="sm" variant="ghost" className="h-8 px-2 text-xs text-destructive hover:text-destructive" disabled={busyId === account.id} onClick={() => permanentlyRemoveAccount(account)} title="Permanently delete account"><Trash2 className="h-3.5 w-3.5" />{busyId === account.id ? "Deleting…" : "Delete"}</Button>}
+                  {account.id !== userId && (role === "super" || account.role === "student") && <Button size="sm" variant="outline" className="h-8 px-3 text-xs" disabled={busyId === account.id} onClick={() => openAccountEditor(account)}><Pencil className="mr-1 h-3.5 w-3.5" />Edit</Button>}
                 </div>
               </div>)}
             </div>
@@ -216,5 +257,42 @@ export default function CredentialsPage() {
         </div>
       </SectionCard>
     </div>
+      <Dialog open={!!editTarget} onOpenChange={(open) => { if (!open && !editSaving) setEditTarget(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <div className="mb-2 flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary"><ShieldCheck className="size-5" /></div>
+            <DialogTitle>Edit account access</DialogTitle>
+            <DialogDescription>Manage the password or remove this account. Changes apply immediately.</DialogDescription>
+          </DialogHeader>
+          {editTarget && (
+            <div className="rounded-lg border bg-muted/30 p-3">
+              <p className="font-semibold">{editTarget.full_name || editTarget.email}</p>
+              <p className="text-sm text-muted-foreground">{editTarget.email}</p>
+              <div className="mt-2 flex gap-2"><Badge variant="outline">{editTarget.role}</Badge><Badge variant="secondary">{editTarget.status}</Badge></div>
+            </div>
+          )}
+          <form onSubmit={saveAccountPassword} className="space-y-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-password">New password</Label>
+              <div className="relative">
+                <Input id="edit-password" required minLength={8} type={showEditPassword ? "text" : "password"} autoComplete="new-password" value={editPassword} onChange={(e) => setEditPassword(e.target.value)} placeholder="At least 8 characters" className="pr-10" />
+                <button type="button" onClick={() => setShowEditPassword((v) => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" aria-label={showEditPassword ? "Hide password" : "Show password"}>{showEditPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}</button>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="confirm-password">Confirm password</Label>
+              <Input id="confirm-password" required minLength={8} type={showEditPassword ? "text" : "password"} autoComplete="new-password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Re-enter new password" />
+            </div>
+            {editError && <p role="alert" className="text-sm text-destructive">{editError}</p>}
+            <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-between">
+              {role === "super" && <Button type="button" variant="destructive" disabled={editSaving || busyId === editTarget?.id} onClick={deleteFromEditor}><Trash2 className="mr-1 size-4" />Delete account</Button>}
+              <div className="flex gap-2">
+                <Button type="button" variant="outline" onClick={() => setEditTarget(null)} disabled={editSaving}>Cancel</Button>
+                <Button type="submit" disabled={editSaving || !editPassword || !confirmPassword}>{editSaving ? "Saving…" : "Save password"}</Button>
+              </div>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
   </>;
 }
