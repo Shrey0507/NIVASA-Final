@@ -352,7 +352,7 @@ router.post("/:id/deactivate", async (req, res, next) => {
 /**
  * PATCH /api/accounts/:id/role — change a user's role. SUPER_ADMIN ONLY.
  */
-router.patch("/:id/password", requireSuperAdmin, async (req, res, next) => {
+router.patch("/:id/password", async (req, res, next) => {
   try {
     const password = String(req.body?.password || "");
     if (password.length < 8 || password.length > 128) {
@@ -362,11 +362,14 @@ router.patch("/:id/password", requireSuperAdmin, async (req, res, next) => {
     if (lookupError) throw lookupError;
     const target = targetResult.user;
     const targetRole = target.app_metadata?.role || target.user_metadata?.role;
-    if (!["boys_admin", "girls_admin", "super_admin"].includes(targetRole)) {
-      return res.status(400).json({ error: { message: "Only administrator passwords can be managed here." } });
-    }
     if (target.id === req.userId) {
-      return res.status(400).json({ error: { message: "Use your account security settings to change your own password." } });
+      return res.status(400).json({ error: { message: "You cannot change your own password from the account manager." } });
+    }
+    if (req.role !== "super_admin") {
+      const targetHostel = target.app_metadata?.hostel;
+      if (targetRole !== "student" || !req.hostelScope || targetHostel !== req.hostelScope) {
+        return res.status(403).json({ error: { message: "You can only change passwords for students in your hostel." } });
+      }
     }
     const { error } = await req.supabaseAdmin.auth.admin.updateUserById(target.id, { password });
     if (error) throw error;
