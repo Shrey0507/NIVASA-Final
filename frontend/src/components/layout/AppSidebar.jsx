@@ -1,8 +1,6 @@
 import { NavLink } from "react-router-dom";
-import { LogOut } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { NivasaLogo } from "@/components/ui/nivasa-logo";
 
@@ -60,15 +58,6 @@ export function SidebarUser({ name, role, onLogout }) {
           <p className="truncate text-sm font-semibold">{name}</p>
           <p className="truncate text-xs text-muted-foreground">{role}</p>
         </div>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          onClick={onLogout}
-          aria-label="Sign out"
-          className="text-muted-foreground hover:text-destructive"
-        >
-          <LogOut />
-        </Button>
       </div>
     </div>
   );
