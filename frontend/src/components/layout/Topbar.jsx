@@ -1,4 +1,4 @@
-import { Bell, Menu } from "lucide-react";
+import { Bell, Menu, UserRound, LogOut, ShieldCheck, GraduationCap } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { getMyNotices } from "@/services/studentService";
@@ -24,6 +24,7 @@ export function Topbar({
   onLogout,
   actions,
   showNotifications = false,
+  profile,
 }) {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
@@ -107,11 +108,35 @@ export function Topbar({
           </Popover>
         )}
         <ThemeMenu />
-        <Avatar className="ml-1 size-8">
-          <AvatarFallback className="bg-primary/10 text-xs font-semibold text-primary">
-            {user?.charAt(0)?.toUpperCase() || "U"}
-          </AvatarFallback>
-        </Avatar>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="ghost" size="icon" aria-label="Open profile" title="Profile" className="ml-1 rounded-full p-0">
+              <Avatar className="size-8 ring-1 ring-border">
+                <AvatarFallback className="bg-primary/10 text-xs font-semibold text-primary">
+                  {user?.charAt(0)?.toUpperCase() || "U"}
+                </AvatarFallback>
+              </Avatar>
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="end" sideOffset={10} className="w-[min(19rem,calc(100vw-2rem))] p-0">
+            <div className="border-b px-4 pb-4 pt-5 text-center">
+              <div className="mx-auto mb-3 flex size-16 items-center justify-center rounded-full border-2 border-primary/20 bg-primary/10 text-primary shadow-sm"><UserRound className="size-7" /></div>
+              <p className="truncate text-sm font-semibold">{profile?.full_name || user || "NIVASA User"}</p>
+              <p className="mt-1 truncate text-xs text-muted-foreground">{profile?.email || "Account profile"}</p>
+              <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-medium text-primary">
+                {role === "Student" ? <GraduationCap className="size-3" /> : <ShieldCheck className="size-3" />}{role || "User"}
+              </span>
+            </div>
+            <div className="space-y-2 px-4 py-3 text-xs">
+              {profile?.usn && <div className="flex justify-between gap-3"><span className="text-muted-foreground">USN</span><span className="font-medium">{profile.usn}</span></div>}
+              {profile?.department && <div className="flex justify-between gap-3"><span className="text-muted-foreground">Department</span><span className="font-medium">{profile.department}</span></div>}
+              {profile?.hostel && <div className="flex justify-between gap-3"><span className="text-muted-foreground">Hostel</span><span className="font-medium capitalize">{profile.hostel}</span></div>}
+              {profile?.phone && <div className="flex justify-between gap-3"><span className="text-muted-foreground">Phone</span><span className="font-medium">{profile.phone}</span></div>}
+              {!profile?.usn && !profile?.department && !profile?.hostel && !profile?.phone && <p className="text-center text-muted-foreground">Your account details are shown here.</p>}
+            </div>
+            <div className="border-t p-2"><Button variant="ghost" className="w-full justify-start text-sm" onClick={onLogout}><LogOut className="mr-2 size-4" />Sign out</Button></div>
+          </PopoverContent>
+        </Popover>
       </div>
     </header>
   );
