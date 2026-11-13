@@ -10,7 +10,7 @@ const router = Router();
  */
 router.get("/", async (req, res, next) => {
   try {
-    const { hostel, department, year, search, limit = 50 } = req.query;
+    const { hostel, department, year, search, unassigned, limit = 50 } = req.query;
     let query = req.supabaseAdmin
       .from("students")
       .select("*, rooms(room_number)")
@@ -20,7 +20,7 @@ router.get("/", async (req, res, next) => {
     if (hostel) query = query.eq("hostel", hostel);
     if (department) query = query.eq("department", department);
     if (year) query = query.eq("year", year);
-    if (search) query = query.ilike("full_name", `%${search}%`);
+    if (unassigned === "true") query = query.is("room_id", null);\n    if (search) {\n      const term = String(search).trim().replace(/[,%()]/g, " ");\n      if (term) query = query.or(`full_name.ilike.%${term}%,usn.ilike.%${term}%,email.ilike.%${term}%`);\n    }
 
     const { data, error } = await query;
     if (error) throw error;
