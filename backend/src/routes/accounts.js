@@ -191,7 +191,11 @@ router.post("/admins", requireSuperAdmin, async (req, res, next) => {
       });
     }
 
-    if (String(password).length < 8 || String(password).length > 128) {\n      return res.status(400).json({ error: { message: "Password must be between 8 and 128 characters." } });\n    }\n\n    // Validate the target role
+    if (String(password).length < 8 || String(password).length > 128) {
+      return res.status(400).json({ error: { message: "Password must be between 8 and 128 characters." } });
+    }
+
+    // Validate the target role
     const validRoles = ["boys_admin", "girls_admin", "super_admin"];
     const targetRole = role || (hostel === "girls" ? "girls_admin" : "boys_admin");
     if (!validRoles.includes(targetRole)) {
