@@ -159,6 +159,7 @@ export const createFeeRecord = async (data) =>
       amount: data.amount,
       fee_type: data.category ?? data.feeType,
       due_date: data.dueDate,
+      term: data.term || null,
     }),
   })));
 
