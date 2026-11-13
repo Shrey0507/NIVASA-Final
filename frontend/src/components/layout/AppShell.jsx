@@ -16,6 +16,7 @@ export function AppShell({
   title,
   actions,
   showNotifications = false,
+  profile,
 }) {
   const { pathname } = useLocation();
   const current = [...nav]
@@ -46,6 +47,7 @@ export function AppShell({
           onLogout={onLogout}
           actions={actions}
           showNotifications={showNotifications}
+          profile={profile}
         />
         <main className="flex flex-1 flex-col gap-6 p-4 sm:p-6">
           <Outlet />
