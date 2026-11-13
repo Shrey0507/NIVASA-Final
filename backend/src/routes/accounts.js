@@ -185,13 +185,13 @@ router.post("/students", async (req, res, next) => {
 router.post("/admins", requireSuperAdmin, async (req, res, next) => {
   try {
     const { email, password, full_name, role, hostel } = req.body;
-    if (!email || !full_name) {
+    if (!email || !full_name || !password) {
       return res.status(400).json({
-        error: { message: "Email and full_name are required." },
+        error: { message: "Email, full name and an initial password are required." },
       });
     }
 
-    // Validate the target role
+    if (String(password).length < 8 || String(password).length > 128) {\n      return res.status(400).json({ error: { message: "Password must be between 8 and 128 characters." } });\n    }\n\n    // Validate the target role
     const validRoles = ["boys_admin", "girls_admin", "super_admin"];
     const targetRole = role || (hostel === "girls" ? "girls_admin" : "boys_admin");
     if (!validRoles.includes(targetRole)) {
@@ -205,7 +205,7 @@ router.post("/admins", requireSuperAdmin, async (req, res, next) => {
     const { data: authUser, error: authErr } =
       await admin.auth.admin.createUser({
         email: email.trim().toLowerCase(),
-        password: password || undefined,
+        password,
         email_confirm: true,
         user_metadata: { full_name },
         app_metadata: { role: targetRole },
@@ -345,6 +345,28 @@ router.post("/:id/deactivate", async (req, res, next) => {
 /**
  * PATCH /api/accounts/:id/role — change a user's role. SUPER_ADMIN ONLY.
  */
+router.patch("/:id/password", requireSuperAdmin, async (req, res, next) => {
+  try {
+    const password = String(req.body?.password || "");
+    if (password.length < 8 || password.length > 128) {
+      return res.status(400).json({ error: { message: "Password must be between 8 and 128 characters." } });
+    }
+    const { data: targetResult, error: lookupError } = await req.supabaseAdmin.auth.admin.getUserById(req.params.id);
+    if (lookupError) throw lookupError;
+    const target = targetResult.user;
+    const targetRole = target.app_metadata?.role || target.user_metadata?.role;
+    if (!["boys_admin", "girls_admin", "super_admin"].includes(targetRole)) {
+      return res.status(400).json({ error: { message: "Only administrator passwords can be managed here." } });
+    }
+    if (target.id === req.userId) {
+      return res.status(400).json({ error: { message: "Use your account security settings to change your own password." } });
+    }
+    const { error } = await req.supabaseAdmin.auth.admin.updateUserById(target.id, { password });
+    if (error) throw error;
+    res.json({ success: true });
+  } catch (err) { next(err); }
+});
+
 router.patch("/:id/role", requireSuperAdmin, async (req, res, next) => {
   try {
     const { role } = req.body;
